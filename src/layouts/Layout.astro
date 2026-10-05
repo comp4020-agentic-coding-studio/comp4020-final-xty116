@@ -1,0 +1,71 @@
+---
+import type { Viewer } from "../lib/db";
+import "../styles.css";
+
+interface Props {
+  title: string;
+  description?: string;
+  viewer: Viewer;
+  active?: "groups" | "about";
+  notice?: string | null;
+  error?: string | null;
+}
+
+const {
+  title,
+  description = "StudyNow turns live peer questions into a reusable learning commons.",
+  viewer,
+  active = "groups",
+  notice,
+  error,
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#18352e" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="StudyNow home">
+        <span class="brand-mark" aria-hidden="true">S</span>
+        <span><strong>StudyNow</strong><small>Learning commons</small></span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a class:list={{ active: active === "groups" }} href="/#groups">Study groups</a>
+        <a href="/#join-group">Join with code</a>
+        <a class:list={{ active: active === "about" }} href="/readme/">What good means</a>
+      </nav>
+      <div class="viewer-chip" title={`Anonymous posts appear as ${viewer.anonLabel}`}>
+        <span aria-hidden="true">{viewer.displayName.slice(0, 1).toUpperCase()}</span>
+        <div><strong>{viewer.displayName}</strong><small>{viewer.anonLabel}</small></div>
+      </div>
+    </header>
+
+    {(notice || error) && (
+      <div class:list={["status-banner", { error: Boolean(error) }]} role="status" aria-live="polite">
+        <strong>{error ? "Needs attention" : "Done"}</strong>
+        <p>{error ?? notice}</p>
+        <a href={Astro.url.pathname}>Dismiss</a>
+      </div>
+    )}
+
+    <main id="main-content">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <p><strong>StudyNow</strong> · Questions can be quiet. Knowledge should not disappear.</p>
+      <nav aria-label="Footer navigation">
+        <a href="/">Groups</a>
+        <a href="/readme/">README</a>
+      </nav>
+    </footer>
+  </body>
+</html>

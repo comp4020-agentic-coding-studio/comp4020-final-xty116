@@ -1,0 +1,119 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getQuestion } from "../../lib/db";
+import { formatTimestamp } from "../../lib/format";
+import { getOrCreateViewer } from "../../lib/session";
+
+export const prerender = false;
+
+const viewer = getOrCreateViewer(Astro.cookies);
+const questionId = Number(Astro.params.id);
+const question = Number.isInteger(questionId) ? getQuestion(questionId, viewer.id) : undefined;
+if (!question) Astro.response.status = 404;
+const notice = Astro.url.searchParams.get("notice");
+const error = Astro.url.searchParams.get("error");
+---
+
+<Layout title={question ? `${question.title} | StudyNow` : "Question not found | StudyNow"} {viewer} {notice} {error}>
+  {question ? (
+    <div class="question-page">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Groups</a><span aria-hidden="true">/</span>
+        <a href={`/groups/${question.group.id}`}>{question.group.name}</a><span aria-hidden="true">/</span>
+        <span>Question</span>
+      </nav>
+
+      <div class="question-layout">
+        <article class="question-detail">
+          <header>
+            <div class="question-byline">
+              <span class="avatar" aria-hidden="true">{question.authorName.replace("Anonymous ", "").slice(0, 1)}</span>
+              <div><strong>{question.authorName}</strong><span>{formatTimestamp(question.createdAt)}</span></div>
+            </div>
+            <span class="visibility-badge public">Open question</span>
+          </header>
+          <h1>{question.title}</h1>
+          <p class="question-body">{question.body}</p>
+          <footer>
+            <span>{question.answerCount} {question.answerCount === 1 ? "explanation" : "explanations"}</span>
+            <a href={`/groups/${question.group.id}`}>Back to {question.group.courseCode}</a>
+          </footer>
+        </article>
+
+        <aside class="question-context">
+          <p class="eyebrow">Asked in</p>
+          <h2>{question.group.name}</h2>
+          <p>{question.group.description}</p>
+          <dl>
+            <div><dt>Course</dt><dd>{question.group.courseCode}</dd></div>
+            <div><dt>Learners</dt><dd>{question.group.memberCount}</dd></div>
+          </dl>
+        </aside>
+      </div>
+
+      <section class="answers-section" id="answers" aria-labelledby="answers-title">
+        <header class="section-heading">
+          <div>
+            <p class="eyebrow">Compare explanations</p>
+            <h2 id="answers-title">{question.answers.length === 0 ? "Be the first to answer" : "Different ways through the problem"}</h2>
+          </div>
+          <span>{question.answers.length} shared</span>
+        </header>
+
+        {question.answers.length > 0 && (
+          <div class="answer-grid">
+            {question.answers.map((answer, index) => (
+              <article class="answer-card">
+                <header>
+                  <span class="answer-number">Explanation {String(index + 1).padStart(2, "0")}</span>
+                  <span>{formatTimestamp(answer.createdAt)}</span>
+                </header>
+                <p>{answer.body}</p>
+                <footer>
+                  <span class="avatar small" aria-hidden="true">{answer.authorName.replace("Anonymous ", "").slice(0, 1)}</span>
+                  <strong>{answer.authorName}</strong>
+                </footer>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {question.group.isMember ? (
+          <section class="answer-composer" id="answer">
+            <div>
+              <p class="eyebrow">Add another path</p>
+              <h2>How would you explain it?</h2>
+              <p>Offer a different example, correct an assumption, or make one difficult step more concrete.</p>
+            </div>
+            <form class="stack-form" method="post" action={`/api/questions/${question.id}/answers`}>
+              <label>
+                <span>Your explanation</span>
+                <textarea name="body" minlength="8" maxlength="2400" rows="7" placeholder="Start with the point that unlocked it for you..." required></textarea>
+              </label>
+              <label class="check-control">
+                <input type="checkbox" name="anonymous" checked />
+                <span><strong>Answer anonymously</strong><small>Shown as {viewer.anonLabel}</small></span>
+              </label>
+              <button class="primary-button" type="submit">Add explanation</button>
+            </form>
+          </section>
+        ) : (
+          <section class="answer-composer compact">
+            <div><h2>Join the group to answer</h2><p>Reading stays open; contributing requires membership.</p></div>
+            <form method="post" action="/api/groups/join">
+              <input type="hidden" name="groupId" value={question.group.id} />
+              <button class="primary-button" type="submit">Join and answer</button>
+            </form>
+          </section>
+        )}
+      </section>
+    </div>
+  ) : (
+    <section class="not-found">
+      <p class="error-code">404</p>
+      <h1>This question is not available</h1>
+      <p>It may belong to an invite-only group or have an invalid link.</p>
+      <a class="primary-button" href="/">Return to study groups</a>
+    </section>
+  )}
+</Layout>

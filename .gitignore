@@ -20,3 +20,12 @@ mise.local.toml
 # your course API key, and this repo goes public when you ship. Your tracked
 # harness is CLAUDE.md (and any AGENTS.md), not this directory.
 .claude/
+node_modules/
+dist/
+.astro/
+.data/
+*.db
+*.db-shm
+*.db-wal
+mise.local.toml
+.DS_Store

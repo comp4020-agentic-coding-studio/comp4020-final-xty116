@@ -1,0 +1,160 @@
+---
+import GroupCard from "../components/GroupCard.astro";
+import Layout from "../layouts/Layout.astro";
+import { listJoinedGroups, listPublicGroups, siteCounts } from "../lib/db";
+import { getOrCreateViewer } from "../lib/session";
+
+export const prerender = false;
+
+const viewer = getOrCreateViewer(Astro.cookies);
+const joinedGroups = listJoinedGroups(viewer.id);
+const publicGroups = listPublicGroups(viewer.id);
+const counts = siteCounts();
+const notice = Astro.url.searchParams.get("notice");
+const error = Astro.url.searchParams.get("error");
+---
+
+<Layout title="StudyNow | Ask together, remember together" {viewer} {notice} {error}>
+  <section class="home-intro">
+    <div class="intro-copy">
+      <p class="eyebrow">Live peer learning, without the spotlight</p>
+      <h1>Ask quietly.<br />Understand together.</h1>
+      <p class="intro-text">
+        Join a course or open study group, ask under a stable pseudonym, and compare more than
+        one explanation. The useful part stays here after the room goes quiet.
+      </p>
+      <div class="intro-actions">
+        <a class="primary-button" href="#groups">Find a group</a>
+        <a class="secondary-button" href="#create-group">Create a group</a>
+      </div>
+      <dl class="platform-counts" aria-label="StudyNow activity">
+        <div><dt>Groups</dt><dd>{counts.groupCount}</dd></div>
+        <div><dt>Questions</dt><dd>{counts.questionCount}</dd></div>
+        <div><dt>Explanations</dt><dd>{counts.answerCount}</dd></div>
+      </dl>
+    </div>
+    <figure class="intro-visual">
+      <img
+        src="/images/study-table.jpg"
+        width="900"
+        height="600"
+        alt="Four university students comparing notes and explaining a problem around a shared table"
+      />
+      <figcaption>
+        <strong>Many explanations, one shared memory.</strong>
+      </figcaption>
+    </figure>
+  </section>
+
+  <div class="home-workspace">
+    <section class="groups-section" id="groups" aria-labelledby="groups-title">
+      <header class="section-heading">
+        <div>
+          <p class="eyebrow">Your learning spaces</p>
+          <h2 id="groups-title">Study groups</h2>
+        </div>
+        <span>{joinedGroups.length} joined</span>
+      </header>
+
+      {joinedGroups.length > 0 ? (
+        <div class="group-grid">
+          {joinedGroups.map((group) => <GroupCard {group} />)}
+        </div>
+      ) : (
+        <div class="empty-state">
+          <strong>No groups yet</strong>
+          <p>Join the public study hall below, use a course invite, or create your own group.</p>
+        </div>
+      )}
+
+      <header class="section-heading explore-heading">
+        <div>
+          <p class="eyebrow">Open to everyone</p>
+          <h2>Explore public groups</h2>
+        </div>
+      </header>
+      {publicGroups.length > 0 ? (
+        <div class="group-grid">
+          {publicGroups.map((group) => <GroupCard {group} />)}
+        </div>
+      ) : (
+        <p class="quiet-note">You have joined every public group currently available.</p>
+      )}
+    </section>
+
+    <aside class="setup-panel" aria-label="StudyNow setup">
+      <section class="setup-block" id="join-group">
+        <p class="step-number">01</p>
+        <div>
+          <h2>Join a course</h2>
+          <p>Enter the six-character code shared by your teacher or group organiser.</p>
+        </div>
+        <form class="stack-form" method="post" action="/api/groups/join">
+          <label>
+            <span>Invite code</span>
+            <input
+              class="code-input"
+              name="inviteCode"
+              type="text"
+              minlength="6"
+              maxlength="6"
+              autocomplete="off"
+              placeholder="ABC123"
+              required
+            />
+          </label>
+          <button class="primary-button" type="submit">Join study group</button>
+        </form>
+      </section>
+
+      <section class="setup-block" id="identity">
+        <p class="step-number">02</p>
+        <div>
+          <h2>Set your identity</h2>
+          <p>Your name appears only when you choose it. Anonymous posts use <strong>{viewer.anonLabel}</strong>.</p>
+        </div>
+        <form class="stack-form" method="post" action="/api/profile">
+          <label>
+            <span>Display name</span>
+            <input name="displayName" value={viewer.displayName} minlength="2" maxlength="40" required />
+          </label>
+          <button class="secondary-button" type="submit">Update name</button>
+        </form>
+      </section>
+
+      <section class="setup-block" id="create-group">
+        <p class="step-number">03</p>
+        <div>
+          <h2>Create a group</h2>
+          <p>Start a public learning space or an invite-only course room.</p>
+        </div>
+        <form class="stack-form" method="post" action="/api/groups">
+          <label>
+            <span>Group name</span>
+            <input name="name" minlength="3" maxlength="70" placeholder="Foundations of Data Science" required />
+          </label>
+          <div class="two-fields">
+            <label>
+              <span>School or community</span>
+              <input name="institution" minlength="2" maxlength="80" placeholder="ANU" required />
+            </label>
+            <label>
+              <span>Course code</span>
+              <input name="courseCode" minlength="2" maxlength="30" placeholder="COMP4020" required />
+            </label>
+          </div>
+          <label>
+            <span>What will people study here?</span>
+            <textarea name="description" minlength="12" maxlength="280" rows="4" placeholder="A focused space for weekly questions, alternative explanations and revision." required></textarea>
+          </label>
+          <fieldset class="choice-field">
+            <legend>Who can find it?</legend>
+            <label><input type="radio" name="visibility" value="private" checked /> Invite only</label>
+            <label><input type="radio" name="visibility" value="public" /> Public</label>
+          </fieldset>
+          <button class="primary-button" type="submit">Create study group</button>
+        </form>
+      </section>
+    </aside>
+  </div>
+</Layout>

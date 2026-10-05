@@ -1,0 +1,18 @@
+---
+import * as readme from "../../README.md";
+import Layout from "../layouts/Layout.astro";
+import { getOrCreateViewer } from "../lib/session";
+
+export const prerender = false;
+
+const viewer = getOrCreateViewer(Astro.cookies);
+const title = readme.getHeadings().find((heading) => heading.depth === 1)?.text ?? "What good means for StudyNow";
+const html = (await readme.compiledContent()).replace(/(src|href)="public\//g, '$1="/');
+---
+
+<Layout title={`${title} | StudyNow`} {viewer} active="about">
+  <div class="docs-shell">
+    <a class="back-link" href="/">← Back to StudyNow</a>
+    <article class="docs-content" set:html={html} />
+  </div>
+</Layout>

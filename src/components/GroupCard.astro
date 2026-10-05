@@ -1,0 +1,37 @@
+---
+import type { GroupSummary } from "../lib/db";
+
+interface Props {
+  group: GroupSummary;
+}
+
+const { group } = Astro.props;
+---
+
+<article class="group-card">
+  <header>
+    <div>
+      <p class="card-kicker">{group.institution}</p>
+      <h3><a href={`/groups/${group.id}`}>{group.name}</a></h3>
+    </div>
+    <span class:list={["visibility-badge", group.visibility]}>
+      {group.visibility === "public" ? "Public" : "Invite only"}
+    </span>
+  </header>
+  <p>{group.description}</p>
+  <footer>
+    <dl>
+      <div><dt>Course</dt><dd>{group.courseCode}</dd></div>
+      <div><dt>Learners</dt><dd>{group.memberCount}</dd></div>
+      <div><dt>Questions</dt><dd>{group.questionCount}</dd></div>
+    </dl>
+    {group.isMember ? (
+      <a class="text-action" href={`/groups/${group.id}`}>Open group <span aria-hidden="true">→</span></a>
+    ) : (
+      <form method="post" action="/api/groups/join">
+        <input type="hidden" name="groupId" value={group.id} />
+        <button class="small-button" type="submit">Join group</button>
+      </form>
+    )}
+  </footer>
+</article>

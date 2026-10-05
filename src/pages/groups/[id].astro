@@ -1,0 +1,126 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getGroup, listQuestions } from "../../lib/db";
+import { excerpt, formatTimestamp } from "../../lib/format";
+import { getOrCreateViewer } from "../../lib/session";
+
+export const prerender = false;
+
+const viewer = getOrCreateViewer(Astro.cookies);
+const groupId = Number(Astro.params.id);
+const group = Number.isInteger(groupId) ? getGroup(groupId, viewer.id) : undefined;
+if (!group) Astro.response.status = 404;
+const questions = group ? listQuestions(group.id) : [];
+const notice = Astro.url.searchParams.get("notice");
+const error = Astro.url.searchParams.get("error");
+---
+
+<Layout title={group ? `${group.name} | StudyNow` : "Group not found | StudyNow"} {viewer} {notice} {error}>
+  {group ? (
+    <>
+      <section class="group-masthead">
+        <div class="masthead-inner">
+          <a class="back-link" href="/">← All study groups</a>
+          <div class="group-title-row">
+            <div>
+              <p class="eyebrow">{group.institution} · {group.courseCode}</p>
+              <h1>{group.name}</h1>
+              <p>{group.description}</p>
+            </div>
+            <dl class="group-stats">
+              <div><dt>Learners</dt><dd>{group.memberCount}</dd></div>
+              <div><dt>Questions</dt><dd>{group.questionCount}</dd></div>
+              <div><dt>Access</dt><dd>{group.visibility === "public" ? "Public" : "Invite"}</dd></div>
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      <div class="group-workspace">
+        <section class="question-feed" aria-labelledby="question-feed-title">
+          <header class="section-heading">
+            <div>
+              <p class="eyebrow">Shared questions</p>
+              <h2 id="question-feed-title">What this group is working through</h2>
+            </div>
+            <span>{questions.length} total</span>
+          </header>
+
+          {questions.length > 0 ? (
+            <div class="question-list">
+              {questions.map((question, index) => (
+                <article class="question-row">
+                  <span class="question-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                  <div class="question-content">
+                    <p class="question-meta">{question.authorName} · {formatTimestamp(question.createdAt)}</p>
+                    <h3><a href={`/questions/${question.id}`}>{question.title}</a></h3>
+                    <p>{excerpt(question.body)}</p>
+                  </div>
+                  <a class="answer-count" href={`/questions/${question.id}#answers`}>
+                    <strong>{question.answerCount}</strong>
+                    <span>{question.answerCount === 1 ? "explanation" : "explanations"}</span>
+                  </a>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div class="empty-state">
+              <strong>No questions yet</strong>
+              <p>Open the first question when something deserves more than one explanation.</p>
+            </div>
+          )}
+        </section>
+
+        <aside class="question-sidebar">
+          {group.isOwner && (
+            <section class="invite-panel">
+              <p class="eyebrow">Invite learners</p>
+              <h2>Course code</h2>
+              <code data-invite-code>{group.inviteCode}</code>
+              <p>Share this code with the people who belong in this group.</p>
+            </section>
+          )}
+
+          {group.isMember ? (
+            <section class="ask-panel" id="ask">
+              <p class="eyebrow">Open a question</p>
+              <h2>What are you trying to understand?</h2>
+              <form class="stack-form" method="post" action={`/api/groups/${group.id}/questions`}>
+                <label>
+                  <span>Question</span>
+                  <input name="title" minlength="6" maxlength="140" placeholder="Why does this step work?" required />
+                </label>
+                <label>
+                  <span>Context</span>
+                  <textarea name="body" minlength="12" maxlength="1600" rows="6" placeholder="Share what you already understand and where the reasoning stops making sense." required></textarea>
+                </label>
+                <label class="check-control">
+                  <input type="checkbox" name="anonymous" checked />
+                  <span><strong>Ask anonymously</strong><small>Shown as {viewer.anonLabel}</small></span>
+                </label>
+                <button class="primary-button" type="submit">Open question</button>
+              </form>
+            </section>
+          ) : (
+            <section class="join-panel">
+              <p class="eyebrow">Public group</p>
+              <h2>Join before contributing</h2>
+              <p>You can read the discussion first. Joining lets you ask and offer explanations.</p>
+              <form method="post" action="/api/groups/join">
+                <input type="hidden" name="groupId" value={group.id} />
+                <button class="primary-button" type="submit">Join this group</button>
+              </form>
+            </section>
+          )}
+        </aside>
+      </div>
+    </>
+  ) : (
+    <section class="not-found">
+      <p class="error-code">404</p>
+      <h1>This group is not available</h1>
+      <p>It may be invite-only, or the link may no longer be valid.</p>
+      <a class="primary-button" href="/">Return to study groups</a>
+    </section>
+  )}
+</Layout>
