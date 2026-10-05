@@ -120,3 +120,21 @@ it("rejects a cross-origin write", async () => {
   );
   expect(response.status).toBe(403);
 });
+
+it("accepts the public HTTPS origin behind Fly's HTTP proxy", async () => {
+  const cookie = await newSession();
+  const response = await fetch(new URL("/api/profile", baseUrl), {
+    method: "POST",
+    redirect: "manual",
+    headers: {
+      cookie,
+      origin: "https://comp4020-final-xty116.fly.dev",
+      "content-type": "application/x-www-form-urlencoded",
+      "x-forwarded-host": "comp4020-final-xty116.fly.dev",
+      "x-forwarded-proto": "https",
+    },
+    body: new URLSearchParams({ displayName: "Fly Proxy Learner" }),
+  });
+
+  expect(response.status).toBe(303);
+});

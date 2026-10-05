@@ -8,4 +8,12 @@ export default defineConfig({
     host: true,
     port: 8080,
   },
+  security: {
+    allowedDomains: [
+      {
+        hostname: "comp4020-final-xty116.fly.dev",
+        protocol: "https",
+      },
+    ],
+  },
 });

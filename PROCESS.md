@@ -61,6 +61,13 @@ future sketch support. I tightened the mobile navigation and removed that
 promise: a Crit 8 interface should show what works now, not disabled evidence
 of ambition.
 
+The public deployment exposed a boundary unavailable locally: Fly terminates
+HTTPS before forwarding plain HTTP to Astro. The original
+same-origin check therefore rejected legitimate forms. I configured Astro to
+trust only the exact Fly HTTPS domain, kept the application-level origin check,
+added a full-stack regression test for that proxy shape, and repeated the
+two-session flow against the live app.
+
 This first account is intentionally shorter than the final project's required
 900–1100 words. I will rewrite it after Crits 9 and 10 as real-time behaviour,
 observability and retrieval decisions create evidence worth defending.
