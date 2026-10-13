@@ -38,6 +38,43 @@ function idFrom(location: string | null, kind: "groups" | "questions"): number {
   return Number(match[1]);
 }
 
+async function waitForServerEvent(
+  response: Response,
+  eventName: string,
+  timeoutMs = 1_000,
+): Promise<Record<string, unknown>> {
+  if (!response.body) throw new Error("Realtime response has no body");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const readEvent = async (): Promise<Record<string, unknown>> => {
+    while (true) {
+      const boundary = buffer.indexOf("\n\n");
+      if (boundary !== -1) {
+        const frame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        const lines = frame.split("\n");
+        const name = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+        const data = lines.find((line) => line.startsWith("data:"))?.slice(5).trim();
+        if (name === eventName && data) return JSON.parse(data) as Record<string, unknown>;
+        continue;
+      }
+
+      const chunk = await reader.read();
+      if (chunk.done) throw new Error(`Realtime stream ended before ${eventName}`);
+      buffer += decoder.decode(chunk.value, { stream: true }).replace(/\r\n/g, "\n");
+    }
+  };
+
+  return Promise.race([
+    readEvent(),
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`${eventName} did not arrive within ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]).finally(() => reader.cancel());
+}
+
 it("supports a private, persistent, anonymous multi-person study flow", async () => {
   const suffix = crypto.randomUUID().slice(0, 8);
   const owner = await newSession();
@@ -137,4 +174,45 @@ it("accepts the public HTTPS origin behind Fly's HTTP proxy", async () => {
   });
 
   expect(response.status).toBe(303);
+});
+
+it("delivers a new question to another open session within one second", async () => {
+  const suffix = crypto.randomUUID().slice(0, 8);
+  const owner = await newSession();
+  const learner = await newSession();
+
+  const created = await post("/api/groups", owner, {
+    name: `Realtime Contract ${suffix}`,
+    institution: "Test University",
+    courseCode: `LIVE${suffix}`,
+    description: "A private room used to verify live delivery between two sessions.",
+    visibility: "private",
+  });
+  const groupId = idFrom(created.headers.get("location"), "groups");
+  const ownerView = await fetch(new URL(`/groups/${groupId}`, baseUrl), {
+    headers: { cookie: owner },
+  });
+  const inviteCode = (await ownerView.text()).match(/data-invite-code>([A-Z0-9]{6})</)?.[1];
+  expect(inviteCode).toBeTruthy();
+  expect((await post("/api/groups/join", learner, { inviteCode: inviteCode! })).status).toBe(303);
+
+  const stream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
+    headers: { cookie: learner },
+  });
+  expect(stream.status).toBe(200);
+  expect(stream.headers.get("content-type")).toContain("text/event-stream");
+
+  const liveQuestion = waitForServerEvent(stream, "question.created");
+  const startedAt = performance.now();
+  const asked = await post(`/api/groups/${groupId}/questions`, owner, {
+    title: `Does this arrive live? ${suffix}`,
+    body: "The second learner should receive this question without reloading the group page.",
+    anonymous: "on",
+  });
+  expect(asked.status).toBe(303);
+  const questionId = idFrom(asked.headers.get("location"), "questions");
+  const event = await liveQuestion;
+
+  expect(performance.now() - startedAt).toBeLessThan(1_000);
+  expect(event).toMatchObject({ groupId, questionId });
 });
