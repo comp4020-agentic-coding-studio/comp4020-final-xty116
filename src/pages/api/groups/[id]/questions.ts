@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { createQuestion } from "../../../../lib/db";
 import { assertSameOrigin, errorResponse, formText, seeOther, ValidationError } from "../../../../lib/http";
+import { publishToGroup } from "../../../../lib/realtime";
 import { getOrCreateViewer } from "../../../../lib/session";
 
 export const prerender = false;
@@ -20,6 +21,7 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
       anonymous: form.get("anonymous") === "on",
     });
     if (!questionId) throw new ValidationError("Join this group before asking a question");
+    publishToGroup({ type: "question.created", groupId, questionId });
     return seeOther(`/questions/${questionId}`, { notice: "Your question is open for more than one explanation." });
   } catch (error) {
     return errorResponse(error, `/groups/${groupId}#ask`);
