@@ -238,3 +238,39 @@ it("delivers a new question to another open session within one second", async ()
   expect(performance.now() - answerStartedAt).toBeLessThan(1_000);
   expect(answerEvent).toMatchObject({ groupId, questionId });
 });
+
+it("shares only an anonymous count when several learners are present", async () => {
+  const suffix = crypto.randomUUID().slice(0, 8);
+  const owner = await newSession();
+  const learner = await newSession();
+  expect((await post("/api/profile", owner, { displayName: `Named Owner ${suffix}` })).status).toBe(303);
+  expect((await post("/api/profile", learner, { displayName: `Named Learner ${suffix}` })).status).toBe(303);
+
+  const created = await post("/api/groups", owner, {
+    name: `Presence Contract ${suffix}`,
+    institution: "Test University",
+    courseCode: `HERE${suffix}`,
+    description: "A private room used to verify anonymous presence between two sessions.",
+    visibility: "private",
+  });
+  const groupId = idFrom(created.headers.get("location"), "groups");
+  const ownerView = await fetch(new URL(`/groups/${groupId}`, baseUrl), {
+    headers: { cookie: owner },
+  });
+  const inviteCode = (await ownerView.text()).match(/data-invite-code>([A-Z0-9]{6})</)?.[1];
+  expect(inviteCode).toBeTruthy();
+  expect((await post("/api/groups/join", learner, { inviteCode: inviteCode! })).status).toBe(303);
+
+  const ownerStream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
+    headers: { cookie: owner },
+  });
+  const learnerStream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
+    headers: { cookie: learner },
+  });
+  const presence = await waitForServerEvent(learnerStream, "presence.changed");
+
+  expect(presence).toEqual({ groupId, activeLearners: 2 });
+  expect(JSON.stringify(presence)).not.toContain(`Named Owner ${suffix}`);
+  expect(JSON.stringify(presence)).not.toContain(`Named Learner ${suffix}`);
+  await ownerStream.body?.cancel();
+});
