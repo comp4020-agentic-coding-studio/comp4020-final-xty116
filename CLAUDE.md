@@ -24,12 +24,18 @@ explanations can coexist, and today's help remains useful tomorrow.
   under `/data`, the course-managed persistent Fly volume.
 - Keep schema changes explicit and additive. Enable foreign keys and WAL mode
   at startup, and never depend on in-memory state for user-visible content.
+- SQLite remains authoritative for questions and answers. In-memory state may
+  fan out events and count current connections, but reconnecting clients must
+  rebuild their view from SQLite rather than depend on missed events.
 - Authorise every read and write on the server. A hidden button is not an
   access-control rule.
 - Keep the no-JavaScript form path usable. JavaScript may add live updates in
   later crits, but it cannot be the only way to ask, join, or answer.
 - Reject cross-origin writes, validate lengths at the boundary, and escape all
   user content before it reaches HTML.
+- Authorise every real-time subscription with the same visibility rule as its
+  group page. Broadcast only after the database write succeeds, never while a
+  contribution is still a draft.
 - Preserve `fly.toml`, the supplied Docker constraints, and the `/readme/`
   contract. Test product behaviour through the running production build.
 
@@ -41,12 +47,17 @@ explanations can coexist, and today's help remains useful tomorrow.
   a marketing page or a feed designed for endless scrolling.
 - Use semantic landmarks, explicit labels, useful empty states, visible
   keyboard focus, and status messages announced with `aria-live`.
+- Show aggregate live presence, never a roster. A connection problem must be
+  visible as `Reconnecting`, and live updates must not replace a form or erase
+  its draft.
 - Keep controls stable and text readable. Every visible action must work; do
   not ship disabled previews of future image, drawing, AI, or real-time tools.
 
 ## Verification rules
 
 - Add an HTTP contract test before or with every important product promise.
+- Time real-time delivery through two independent HTTP sessions and keep the
+  one-second requirement in the running-app contract.
 - Run `pnpm check` and `pnpm check:evidence` before each deploy.
 - Test a second independent session, a reload, a server restart, and both
   marking viewports before calling a milestone complete.

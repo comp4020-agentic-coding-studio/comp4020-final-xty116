@@ -42,23 +42,31 @@ JavaScript, at the desktop and phone marking viewports, with a keyboard and
 clear form labels. The W3C's guidance that visible, associated labels make
 forms more predictable informed the deliberately plain contribution forms.
 
-## What the Crit 8 build protects
+## What the current build protects
 
-The first version enforces persistent groups, invitation membership, public
-discovery, anonymous or named questions, and multiple independent answers.
-SQLite writes the trace to the Fly volume rather than process memory. Contract
-tests use two independent sessions to prove that private groups stay private,
+StudyNow enforces persistent groups, invitation membership, public discovery,
+anonymous questions, and independent answers.
+SQLite writes to the Fly volume rather than process memory. Contract tests use
+independent sessions to prove that private groups stay private,
 membership changes access, anonymous posts do not reveal a chosen display
 name, two people can answer one question, and their work survives a reload.
+
+The real-time layer broadcasts only work that has already been committed to
+SQLite. Open group pages receive new questions and answer counts; open question
+pages receive new explanations, normally within a second and without a reload.
+An aggregate presence count says that other learners are here without naming
+them. Drafts remain local. If the connection drops, the interface says so,
+reconnects automatically and synchronises the visible regions from durable
+storage.
 
 ## What I chose not to build
 
 This is not an LMS, a general chat server or an AI homework generator. There is
 no university login integration, gradebook, follower graph, popularity ranking
-or infinite feed. Image answers, a drawing surface, real-time delivery and
-permission-aware semantic retrieval remain later project decisions. Shipping
-their disabled controls now would make the interface look further along while
-making the core less believable.
+or infinite feed. Image answers, a drawing surface and permission-aware
+semantic retrieval remain later project decisions. Shipping their disabled
+controls now would make the interface look further along while making the core
+less believable.
 
 ## Sources
 

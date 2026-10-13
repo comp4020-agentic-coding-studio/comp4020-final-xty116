@@ -68,6 +68,50 @@ trust only the exact Fly HTTPS domain, kept the application-level origin check,
 added a full-stack regression test for that proxy shape, and repeated the
 two-session flow against the live app.
 
-This first account is intentionally shorter than the final project's required
-900–1100 words. I will rewrite it after Crits 9 and 10 as real-time behaviour,
-observability and retrieval decisions create evidence worth defending.
+## Real time without a second truth
+
+For Crit 9 I defined the public seam before choosing a transport. In
+[`d692900`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/d692900),
+one authenticated browser holds a stream open while another creates a question;
+the event must carry the resulting question ID in under one second. The first
+run failed at a useful place, a missing endpoint returning 404. Server-sent
+events were the smallest answer because StudyNow's writes already had reliable
+form endpoints and the missing direction was only server-to-browser. WebSockets
+would duplicate the write path and fast polling would make the one-second claim
+by continuously asking the database whether anything happened.
+
+The next contract in
+[`cdc5b3d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/cdc5b3d)
+made answers live through the same channel and proved a non-member receives 404
+from a private group's stream. The question and answer implementation commits
+[`e9805b2`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/e9805b2)
+and
+[`091b5d4`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/091b5d4)
+keep SQLite ahead of the broadcast: an event exists only after its durable write
+succeeds. An interrupted stream can therefore forget events safely; reconnecting
+clients fetch the current regions from the database.
+
+The harder product choice was presence. I considered a named roster, no signal,
+and an anonymous count. The README's definition of good ruled out the roster:
+showing exactly who is watching would put the spotlight back onto a learner's
+uncertainty. The failing presence contract in
+[`9f8a850`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/9f8a850)
+therefore asks only for `activeLearners: 2` and explicitly rejects both display
+names. [ADR 002](docs/adr-002-realtime-presence.md) records the choice and its
+cost. My first green run still failed because the test demanded exact object
+equality and rejected the harmless event `type`; changing it to assert only the
+published fields corrected the harness rather than distorting the event format.
+
+The browser layer in
+[`345054f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/345054f)
+replaces only question, answer and count regions. I verified it with an open
+browser plus a second cookie session: a question and an answer appeared without
+the URL changing or a reload. At 1920×1080 and 390×844 there was no horizontal
+overflow. Stopping the server changed the visible state to `Reconnecting`;
+starting it against the same SQLite file returned it to `Live` and restored the
+new content. That manual interruption checked the part a green delivery timer
+could not: what the learner sees when the happy path ends.
+
+This account will grow once Crit 10 adds production observability. The remaining
+work is not to invent a cleaner history, but to use logs and measurements to
+test whether these decisions survive real concurrent use.
