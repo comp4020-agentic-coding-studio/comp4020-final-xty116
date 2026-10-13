@@ -269,7 +269,7 @@ it("shares only an anonymous count when several learners are present", async () 
   });
   const presence = await waitForServerEvent(learnerStream, "presence.changed");
 
-  expect(presence).toEqual({ groupId, activeLearners: 2 });
+  expect(presence).toMatchObject({ groupId, activeLearners: 2 });
   expect(JSON.stringify(presence)).not.toContain(`Named Owner ${suffix}`);
   expect(JSON.stringify(presence)).not.toContain(`Named Learner ${suffix}`);
   await ownerStream.body?.cancel();

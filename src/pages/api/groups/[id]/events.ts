@@ -25,7 +25,7 @@ export const GET: APIRoute = ({ cookies, params, request }) => {
       const send = (event: GroupEvent) => {
         if (!closed) controller.enqueue(frame(event.type, event));
       };
-      const unsubscribe = subscribeToGroup(groupId, send);
+      const unsubscribe = subscribeToGroup(groupId, viewer.id, send);
       const keepAlive = setInterval(() => {
         if (!closed) controller.enqueue(encoder.encode(": keep-alive\n\n"));
       }, 20_000);
