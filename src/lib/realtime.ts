@@ -4,7 +4,13 @@ export interface QuestionCreatedEvent {
   questionId: number;
 }
 
-export type GroupEvent = QuestionCreatedEvent;
+export interface AnswerCreatedEvent {
+  type: "answer.created";
+  groupId: number;
+  questionId: number;
+}
+
+export type GroupEvent = QuestionCreatedEvent | AnswerCreatedEvent;
 type Subscriber = (event: GroupEvent) => void;
 
 const subscribersByGroup = new Map<number, Set<Subscriber>>();

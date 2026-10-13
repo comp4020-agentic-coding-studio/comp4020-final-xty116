@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { createAnswer } from "../../../../lib/db";
 import { assertSameOrigin, errorResponse, formText, seeOther, ValidationError } from "../../../../lib/http";
+import { publishToGroup } from "../../../../lib/realtime";
 import { getOrCreateViewer } from "../../../../lib/session";
 
 export const prerender = false;
@@ -12,13 +13,14 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
     assertSameOrigin(request);
     const viewer = getOrCreateViewer(cookies);
     const form = await request.formData();
-    const created = createAnswer({
+    const groupId = createAnswer({
       questionId,
       viewerId: viewer.id,
       body: formText(form, "body", { min: 8, max: 2400 }),
       anonymous: form.get("anonymous") === "on",
     });
-    if (!created) throw new ValidationError("Join the group before adding an explanation");
+    if (!groupId) throw new ValidationError("Join the group before adding an explanation");
+    publishToGroup({ type: "answer.created", groupId, questionId });
     return seeOther(`/questions/${questionId}#answers`, { notice: "Your explanation has been added." });
   } catch (error) {
     return errorResponse(error, `/questions/${questionId}#answer`);

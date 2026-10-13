@@ -437,18 +437,18 @@ export function createAnswer(input: {
   viewerId: string;
   body: string;
   anonymous: boolean;
-}): boolean {
+}): number | undefined {
   const question = sqlite
     .prepare("SELECT group_id AS groupId FROM questions WHERE id = ?")
     .get(input.questionId) as { groupId: number } | undefined;
-  if (!question || !isMember(question.groupId, input.viewerId)) return false;
+  if (!question || !isMember(question.groupId, input.viewerId)) return undefined;
   sqlite
     .prepare(
       `INSERT INTO answers (question_id, author_session_id, body, anonymous)
        VALUES (?, ?, ?, ?)`,
     )
     .run(input.questionId, input.viewerId, input.body, Number(input.anonymous));
-  return true;
+  return question.groupId;
 }
 
 export function siteCounts(): { groupCount: number; questionCount: number; answerCount: number } {
