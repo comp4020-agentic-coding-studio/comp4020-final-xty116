@@ -760,6 +760,110 @@ select:focus {
   font-size: 16px;
 }
 
+.realtime-panel {
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: auto auto minmax(220px, 1fr);
+  align-items: center;
+  gap: 24px;
+  margin-top: 26px;
+  padding: 12px 16px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.group-masthead .realtime-panel {
+  color: #fff;
+  background: #24443b;
+  border-color: #47645c;
+}
+
+.realtime-panel.compact {
+  margin: 0 0 18px;
+}
+
+.live-connection,
+.live-connection > span:last-child {
+  display: flex;
+  align-items: center;
+}
+
+.live-connection {
+  gap: 10px;
+}
+
+.live-connection > span:last-child {
+  align-items: flex-start;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.live-connection strong {
+  font-size: 13px;
+}
+
+.live-connection small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.group-masthead .live-connection small,
+.group-masthead .live-privacy {
+  color: #b8cac4;
+}
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  background: var(--yellow);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgb(239 202 92 / 15%);
+}
+
+[data-connection="live"] .live-dot {
+  background: #4fd19c;
+  box-shadow: 0 0 0 4px rgb(79 209 156 / 16%);
+}
+
+[data-connection="reconnecting"] .live-dot {
+  background: var(--coral);
+  box-shadow: 0 0 0 4px rgb(217 95 73 / 16%);
+}
+
+.live-presence,
+.live-privacy {
+  margin: 0;
+  font-size: 12px;
+}
+
+.live-presence strong {
+  font-family: Georgia, serif;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.live-privacy {
+  justify-self: end;
+  color: var(--muted);
+  text-align: right;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .group-workspace {
   max-width: 1440px;
   min-height: 600px;
@@ -1283,6 +1387,16 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
+  .realtime-panel {
+    grid-template-columns: auto 1fr;
+  }
+
+  .live-privacy {
+    grid-column: 1 / -1;
+    justify-self: start;
+    text-align: left;
+  }
+
   .answer-composer {
     grid-template-columns: 1fr;
     gap: 24px;
@@ -1389,6 +1503,15 @@ select:focus {
 
   .group-stats {
     gap: 16px;
+  }
+
+  .realtime-panel {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .live-privacy {
+    grid-column: auto;
   }
 
   .question-row {

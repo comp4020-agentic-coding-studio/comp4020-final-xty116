@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import RealtimePresence from "../../components/RealtimePresence.astro";
 import { getGroup, listQuestions } from "../../lib/db";
 import { excerpt, formatTimestamp } from "../../lib/format";
 import { getOrCreateViewer } from "../../lib/session";
@@ -29,10 +30,11 @@ const error = Astro.url.searchParams.get("error");
             </div>
             <dl class="group-stats">
               <div><dt>Learners</dt><dd>{group.memberCount}</dd></div>
-              <div><dt>Questions</dt><dd>{group.questionCount}</dd></div>
+              <div><dt>Questions</dt><dd data-group-question-count>{group.questionCount}</dd></div>
               <div><dt>Access</dt><dd>{group.visibility === "public" ? "Public" : "Invite"}</dd></div>
             </dl>
           </div>
+          <RealtimePresence groupId={group.id} mode="group" />
         </div>
       </section>
 
@@ -43,32 +45,34 @@ const error = Astro.url.searchParams.get("error");
               <p class="eyebrow">Shared questions</p>
               <h2 id="question-feed-title">What this group is working through</h2>
             </div>
-            <span>{questions.length} total</span>
+            <span data-question-total>{questions.length} total</span>
           </header>
 
-          {questions.length > 0 ? (
-            <div class="question-list">
-              {questions.map((question, index) => (
-                <article class="question-row">
-                  <span class="question-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-                  <div class="question-content">
-                    <p class="question-meta">{question.authorName} · {formatTimestamp(question.createdAt)}</p>
-                    <h3><a href={`/questions/${question.id}`}>{question.title}</a></h3>
-                    <p>{excerpt(question.body)}</p>
-                  </div>
-                  <a class="answer-count" href={`/questions/${question.id}#answers`}>
-                    <strong>{question.answerCount}</strong>
-                    <span>{question.answerCount === 1 ? "explanation" : "explanations"}</span>
-                  </a>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div class="empty-state">
-              <strong>No questions yet</strong>
-              <p>Open the first question when something deserves more than one explanation.</p>
-            </div>
-          )}
+          <div data-question-feed-content>
+            {questions.length > 0 ? (
+              <div class="question-list">
+                {questions.map((question, index) => (
+                  <article class="question-row">
+                    <span class="question-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                    <div class="question-content">
+                      <p class="question-meta">{question.authorName} · {formatTimestamp(question.createdAt)}</p>
+                      <h3><a href={`/questions/${question.id}`}>{question.title}</a></h3>
+                      <p>{excerpt(question.body)}</p>
+                    </div>
+                    <a class="answer-count" href={`/questions/${question.id}#answers`}>
+                      <strong>{question.answerCount}</strong>
+                      <span>{question.answerCount === 1 ? "explanation" : "explanations"}</span>
+                    </a>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div class="empty-state">
+                <strong>No questions yet</strong>
+                <p>Open the first question when something deserves more than one explanation.</p>
+              </div>
+            )}
+          </div>
         </section>
 
         <aside class="question-sidebar">

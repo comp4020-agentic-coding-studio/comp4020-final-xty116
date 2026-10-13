@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import RealtimePresence from "../../components/RealtimePresence.astro";
 import { getQuestion } from "../../lib/db";
 import { formatTimestamp } from "../../lib/format";
 import { getOrCreateViewer } from "../../lib/session";
@@ -23,6 +24,8 @@ const error = Astro.url.searchParams.get("error");
         <span>Question</span>
       </nav>
 
+      <RealtimePresence groupId={question.group.id} mode="question" questionId={question.id} />
+
       <div class="question-layout">
         <article class="question-detail">
           <header>
@@ -35,7 +38,7 @@ const error = Astro.url.searchParams.get("error");
           <h1>{question.title}</h1>
           <p class="question-body">{question.body}</p>
           <footer>
-            <span>{question.answerCount} {question.answerCount === 1 ? "explanation" : "explanations"}</span>
+            <span data-question-answer-total>{question.answerCount} {question.answerCount === 1 ? "explanation" : "explanations"}</span>
             <a href={`/groups/${question.group.id}`}>Back to {question.group.courseCode}</a>
           </footer>
         </article>
@@ -55,28 +58,35 @@ const error = Astro.url.searchParams.get("error");
         <header class="section-heading">
           <div>
             <p class="eyebrow">Compare explanations</p>
-            <h2 id="answers-title">{question.answers.length === 0 ? "Be the first to answer" : "Different ways through the problem"}</h2>
+            <h2 id="answers-title" data-answers-title>{question.answers.length === 0 ? "Be the first to answer" : "Different ways through the problem"}</h2>
           </div>
-          <span>{question.answers.length} shared</span>
+          <span data-answer-shared-total>{question.answers.length} shared</span>
         </header>
 
-        {question.answers.length > 0 && (
-          <div class="answer-grid">
-            {question.answers.map((answer, index) => (
-              <article class="answer-card">
-                <header>
-                  <span class="answer-number">Explanation {String(index + 1).padStart(2, "0")}</span>
-                  <span>{formatTimestamp(answer.createdAt)}</span>
-                </header>
-                <p>{answer.body}</p>
-                <footer>
-                  <span class="avatar small" aria-hidden="true">{answer.authorName.replace("Anonymous ", "").slice(0, 1)}</span>
-                  <strong>{answer.authorName}</strong>
-                </footer>
-              </article>
-            ))}
-          </div>
-        )}
+        <div data-answer-list>
+          {question.answers.length > 0 ? (
+            <div class="answer-grid">
+              {question.answers.map((answer, index) => (
+                <article class="answer-card">
+                  <header>
+                    <span class="answer-number">Explanation {String(index + 1).padStart(2, "0")}</span>
+                    <span>{formatTimestamp(answer.createdAt)}</span>
+                  </header>
+                  <p>{answer.body}</p>
+                  <footer>
+                    <span class="avatar small" aria-hidden="true">{answer.authorName.replace("Anonymous ", "").slice(0, 1)}</span>
+                    <strong>{answer.authorName}</strong>
+                  </footer>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div class="empty-state answer-empty">
+              <strong>No explanations yet</strong>
+              <p>Someone can add the first path through this question below.</p>
+            </div>
+          )}
+        </div>
 
         {question.group.isMember ? (
           <section class="answer-composer" id="answer">
