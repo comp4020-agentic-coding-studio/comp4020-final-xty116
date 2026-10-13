@@ -194,6 +194,12 @@ it("delivers a new question to another open session within one second", async ()
   });
   const inviteCode = (await ownerView.text()).match(/data-invite-code>([A-Z0-9]{6})</)?.[1];
   expect(inviteCode).toBeTruthy();
+
+  const hiddenStream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
+    headers: { cookie: learner },
+  });
+  expect(hiddenStream.status).toBe(404);
+
   expect((await post("/api/groups/join", learner, { inviteCode: inviteCode! })).status).toBe(303);
 
   const stream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
@@ -215,4 +221,20 @@ it("delivers a new question to another open session within one second", async ()
 
   expect(performance.now() - startedAt).toBeLessThan(1_000);
   expect(event).toMatchObject({ groupId, questionId });
+
+  const answerStream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
+    headers: { cookie: learner },
+  });
+  expect(answerStream.status).toBe(200);
+  const liveAnswer = waitForServerEvent(answerStream, "answer.created");
+  const answerStartedAt = performance.now();
+  const answered = await post(`/api/questions/${questionId}/answers`, owner, {
+    body: "The question event arrived through a live server stream.",
+    anonymous: "on",
+  });
+  expect(answered.status).toBe(303);
+  const answerEvent = await liveAnswer;
+
+  expect(performance.now() - answerStartedAt).toBeLessThan(1_000);
+  expect(answerEvent).toMatchObject({ groupId, questionId });
 });
