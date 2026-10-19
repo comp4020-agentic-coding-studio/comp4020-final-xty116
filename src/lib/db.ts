@@ -451,6 +451,13 @@ export function createAnswer(input: {
   return question.groupId;
 }
 
+export function questionGroupId(questionId: number): number | undefined {
+  const question = sqlite
+    .prepare("SELECT group_id AS groupId FROM questions WHERE id = ?")
+    .get(questionId) as { groupId: number } | undefined;
+  return question?.groupId;
+}
+
 export function siteCounts(): { groupCount: number; questionCount: number; answerCount: number } {
   return sqlite
     .prepare(
