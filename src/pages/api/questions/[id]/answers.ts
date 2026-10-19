@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { recordActivity } from "../../../../lib/activity";
 import { createAnswer } from "../../../../lib/db";
 import { assertSameOrigin, errorResponse, formText, seeOther, ValidationError } from "../../../../lib/http";
 import { publishToGroup } from "../../../../lib/realtime";
@@ -20,6 +21,7 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
       anonymous: form.get("anonymous") === "on",
     });
     if (!groupId) throw new ValidationError("Join the group before adding an explanation");
+    recordActivity(viewer, { action: "answer.created", result: "succeeded", groupId, questionId });
     publishToGroup({ type: "answer.created", groupId, questionId });
     return seeOther(`/questions/${questionId}#answers`, { notice: "Your explanation has been added." });
   } catch (error) {

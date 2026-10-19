@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { APIRoute } from "astro";
+import { recordActivity } from "../../../lib/activity";
 import { createGroup } from "../../../lib/db";
 import { assertSameOrigin, errorResponse, formText, seeOther, ValidationError } from "../../../lib/http";
 import { getOrCreateViewer } from "../../../lib/session";
@@ -25,6 +26,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       visibility: visibilityValue,
       inviteCode: randomBytes(4).toString("hex").slice(0, 6).toUpperCase(),
     });
+    recordActivity(viewer, { action: "group.created", result: "succeeded", groupId });
     return seeOther(`/groups/${groupId}`, { notice: "Study group created. Share the invite code when you are ready." });
   } catch (error) {
     return errorResponse(error, "/#create-group");
