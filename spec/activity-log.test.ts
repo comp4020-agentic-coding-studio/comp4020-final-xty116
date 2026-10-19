@@ -221,3 +221,62 @@ it("records a server-side permission denial without storing the rejected content
   expect(output).not.toContain(rejectedBody);
   expect(output).not.toContain(stranger.split("=", 2)[1]);
 });
+
+it("accounts for identity changes, invalid invitations and rejected answers", async () => {
+  const suffix = crypto.randomUUID().slice(0, 8);
+  const owner = await newSession();
+  const stranger = await newSession();
+  const eventsBefore = (await activityEvents(6)).length;
+  const displayName = `Instrument Learner ${suffix}`;
+
+  expect((await post("/api/profile", stranger, { displayName })).status).toBe(303);
+
+  const created = await post("/api/groups", owner, {
+    name: `Answer Instrument ${suffix}`,
+    institution: "Test University",
+    courseCode: `ANS${suffix}`,
+    description: "A private room used to verify the remaining activity log outcomes.",
+    visibility: "private",
+  });
+  const groupId = idFrom(created, "groups");
+  const asked = await post(`/api/groups/${groupId}/questions`, owner, {
+    title: `Who may answer this question? ${suffix}`,
+    body: "Only members of this private group should be able to add an explanation.",
+    anonymous: "on",
+  });
+  const questionId = idFrom(asked, "questions");
+  const rejectedAnswer = `A non-member answer that must remain private ${suffix}`;
+
+  const answerResponse = await post(`/api/questions/${questionId}/answers`, stranger, {
+    body: rejectedAnswer,
+    anonymous: "on",
+  });
+  expect(answerResponse.status).toBe(303);
+  expect(answerResponse.headers.get("location")).toContain("Join+the+group");
+
+  const invalidInvite = `NO${suffix.slice(0, 4)}`.toUpperCase();
+  const joinResponse = await post("/api/groups/join", stranger, { inviteCode: invalidInvite });
+  expect(joinResponse.status).toBe(303);
+  expect(joinResponse.headers.get("location")).toContain("does+not+match");
+
+  const events = await activityEvents(eventsBefore + 5);
+  const profileUpdated = events.find(
+    (event) => event.action === "profile.updated" && event.result === "succeeded",
+  );
+  const answerDenied = events.find(
+    (event) =>
+      event.action === "answer.created" &&
+      event.result === "denied" &&
+      event.questionId === questionId,
+  );
+  const joinRejected = events.find(
+    (event) => event.action === "group.joined" && event.result === "rejected",
+  );
+
+  expect(profileUpdated?.actorId).toMatch(/^[a-f0-9]{12}$/);
+  expect(answerDenied).toMatchObject({ actorId: profileUpdated?.actorId, groupId });
+  expect(joinRejected).toMatchObject({ actorId: profileUpdated?.actorId });
+  expect(output).not.toContain(displayName);
+  expect(output).not.toContain(rejectedAnswer);
+  expect(output).not.toContain(invalidInvite);
+});
