@@ -182,3 +182,42 @@ it("tells two browser sessions apart in server activity logs without leaking the
   expect(output).not.toContain(questionBody);
   expect(output).not.toContain(answerBody);
 });
+
+it("records a server-side permission denial without storing the rejected content", async () => {
+  const suffix = crypto.randomUUID().slice(0, 8);
+  const owner = await newSession();
+  const stranger = await newSession();
+  const eventsBefore = (await activityEvents(4)).length;
+
+  const created = await post("/api/groups", owner, {
+    name: `Private Instrument ${suffix}`,
+    institution: "Test University",
+    courseCode: `LOCK${suffix}`,
+    description: "A private room used to verify that denied writes are visible in the logs.",
+    visibility: "private",
+  });
+  const groupId = idFrom(created, "groups");
+  const rejectedBody = `This rejected draft must never enter the logs ${suffix}`;
+
+  const rejected = await post(`/api/groups/${groupId}/questions`, stranger, {
+    title: `A stranger should not post ${suffix}`,
+    body: rejectedBody,
+    anonymous: "on",
+  });
+  expect(rejected.status).toBe(303);
+  expect(rejected.headers.get("location")).toContain("Join+this+group");
+
+  const events = await activityEvents(eventsBefore + 2);
+  const denied = events.find(
+    (event) =>
+      event.action === "question.created" && event.result === "denied" && event.groupId === groupId,
+  );
+  expect(denied?.actorId).toMatch(/^[a-f0-9]{12}$/);
+  expect(denied?.actorLabel).toMatch(/^Anonymous /);
+
+  const groupPage = await fetch(new URL(`/groups/${groupId}`, appUrl), { headers: { cookie: owner } });
+  expect(groupPage.status).toBe(200);
+  expect(await groupPage.text()).not.toContain(`A stranger should not post ${suffix}`);
+  expect(output).not.toContain(rejectedBody);
+  expect(output).not.toContain(stranger.split("=", 2)[1]);
+});
