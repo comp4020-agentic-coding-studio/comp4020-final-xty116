@@ -1,0 +1,184 @@
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { once } from "node:events";
+import { mkdtemp, rm } from "node:fs/promises";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, beforeAll, expect, it } from "vitest";
+
+interface ActivityEvent {
+  event: "studynow.activity";
+  actorId: string;
+  actorLabel: string;
+  action: string;
+  result: string;
+  groupId?: number;
+  questionId?: number;
+}
+
+let app: ChildProcessWithoutNullStreams;
+let appUrl: string;
+let output = "";
+let dataDirectory: string;
+
+async function availablePort(): Promise<number> {
+  const server = createServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Could not reserve a test port");
+  server.close();
+  await once(server, "close");
+  return address.port;
+}
+
+async function waitUntilReady(url: string): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return;
+    } catch {
+      // The production server is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Instrumented app did not start. Output:\n${output}`);
+}
+
+function cookieFrom(response: Response): string {
+  const cookie = response.headers.get("set-cookie")?.split(";", 1)[0];
+  if (!cookie) throw new Error("StudyNow did not issue a session cookie");
+  return cookie;
+}
+
+async function newSession(): Promise<string> {
+  return cookieFrom(await fetch(appUrl, { redirect: "manual" }));
+}
+
+async function post(path: string, cookie: string, fields: Record<string, string>): Promise<Response> {
+  return fetch(new URL(path, appUrl), {
+    method: "POST",
+    redirect: "manual",
+    headers: {
+      cookie,
+      origin: new URL(appUrl).origin,
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(fields),
+  });
+}
+
+function idFrom(response: Response, kind: "groups" | "questions"): number {
+  const match = response.headers.get("location")?.match(new RegExp(`/${kind}/(\\d+)`));
+  if (!match) throw new Error(`No ${kind} id in redirect`);
+  return Number(match[1]);
+}
+
+async function activityEvents(expectedCount: number): Promise<ActivityEvent[]> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const events = output
+      .split("\n")
+      .flatMap((line) => {
+        try {
+          const event = JSON.parse(line) as ActivityEvent;
+          return event.event === "studynow.activity" ? [event] : [];
+        } catch {
+          return [];
+        }
+      });
+    if (events.length >= expectedCount) return events;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return [];
+}
+
+beforeAll(async () => {
+  dataDirectory = await mkdtemp(join(tmpdir(), "studynow-activity-"));
+  const port = await availablePort();
+  appUrl = `http://127.0.0.1:${port}`;
+  app = spawn(process.execPath, ["dist/server/entry.mjs"], {
+    env: {
+      ...process.env,
+      HOST: "127.0.0.1",
+      PORT: String(port),
+      DATABASE_PATH: join(dataDirectory, "studynow.db"),
+    },
+  });
+  app.stdout.setEncoding("utf8");
+  app.stderr.setEncoding("utf8");
+  app.stdout.on("data", (chunk: string) => {
+    output += chunk;
+  });
+  app.stderr.on("data", (chunk: string) => {
+    output += chunk;
+  });
+  await waitUntilReady(appUrl);
+});
+
+afterAll(async () => {
+  app.kill("SIGTERM");
+  await Promise.race([once(app, "exit"), new Promise((resolve) => setTimeout(resolve, 1_000))]);
+  await rm(dataDirectory, { recursive: true, force: true });
+});
+
+it("tells two browser sessions apart in server activity logs without leaking their work", async () => {
+  const suffix = crypto.randomUUID().slice(0, 8);
+  const owner = await newSession();
+  const learner = await newSession();
+
+  const created = await post("/api/groups", owner, {
+    name: `Instrument Contract ${suffix}`,
+    institution: "Test University",
+    courseCode: `LOG${suffix}`,
+    description: "A room used to verify the production activity log contract.",
+    visibility: "public",
+  });
+  expect(created.status).toBe(303);
+  const groupId = idFrom(created, "groups");
+
+  expect((await post("/api/groups/join", learner, { groupId: String(groupId) })).status).toBe(303);
+
+  const questionBody = `Sensitive question body ${suffix}`;
+  const asked = await post(`/api/groups/${groupId}/questions`, owner, {
+    title: `Can the logs tell us apart? ${suffix}`,
+    body: questionBody,
+    anonymous: "on",
+  });
+  expect(asked.status).toBe(303);
+  const questionId = idFrom(asked, "questions");
+
+  const answerBody = `Sensitive answer body ${suffix}`;
+  expect(
+    (
+      await post(`/api/questions/${questionId}/answers`, learner, {
+        body: answerBody,
+        anonymous: "on",
+      })
+    ).status,
+  ).toBe(303);
+
+  const events = await activityEvents(4);
+  const groupCreated = events.find((event) => event.action === "group.created" && event.groupId === groupId);
+  const groupJoined = events.find((event) => event.action === "group.joined" && event.groupId === groupId);
+  const questionCreated = events.find(
+    (event) => event.action === "question.created" && event.questionId === questionId,
+  );
+  const answerCreated = events.find(
+    (event) => event.action === "answer.created" && event.questionId === questionId,
+  );
+
+  expect(groupCreated).toMatchObject({ result: "succeeded" });
+  expect(groupJoined).toMatchObject({ result: "succeeded" });
+  expect(questionCreated).toMatchObject({ result: "succeeded", groupId });
+  expect(answerCreated).toMatchObject({ result: "succeeded", groupId });
+  expect(groupCreated?.actorId).toBe(questionCreated?.actorId);
+  expect(groupJoined?.actorId).toBe(answerCreated?.actorId);
+  expect(groupCreated?.actorId).not.toBe(groupJoined?.actorId);
+  expect(groupCreated?.actorLabel).toMatch(/^Anonymous /);
+  expect(groupJoined?.actorLabel).toMatch(/^Anonymous /);
+
+  expect(output).not.toContain(owner.split("=", 2)[1]);
+  expect(output).not.toContain(learner.split("=", 2)[1]);
+  expect(output).not.toContain(questionBody);
+  expect(output).not.toContain(answerBody);
+});
