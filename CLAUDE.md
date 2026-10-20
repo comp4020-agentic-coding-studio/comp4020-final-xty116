@@ -36,6 +36,11 @@ explanations can coexist, and today's help remains useful tomorrow.
 - Authorise every real-time subscription with the same visibility rule as its
   group page. Broadcast only after the database write succeeds, never while a
   contribution is still a draft.
+- Emit one structured activity event for every successful core write and
+  authorisation denial. Correlate the server session through its hashed actor
+  ID and stable anonymous label; include action, outcome and resource IDs.
+- Keep session IDs, cookies, invite codes, display names and contribution text
+  out of logs. Verify observability through the built process's stdout.
 - Preserve `fly.toml`, the supplied Docker constraints, and the `/readme/`
   contract. Test product behaviour through the running production build.
 

@@ -112,6 +112,27 @@ starting it against the same SQLite file returned it to `Live` and restored the
 new content. That manual interruption checked the part a green delivery timer
 could not: what the learner sees when the happy path ends.
 
-This account will grow once Crit 10 adds production observability. The remaining
-work is not to invent a cleaner history, but to use logs and measurements to
-test whether these decisions survive real concurrent use.
+## Flying by instruments
+
+Crit 10 made process output a product boundary. The contract in
+[`9685afe`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/9685afe)
+starts the built server, drives two cookie sessions through its HTTP forms and
+reads stdout exactly as `flyctl logs` does. It first failed because successful
+writes produced no activity events. The implementation in
+[`897a067`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/897a067)
+emits one JSON line with action, result and resource IDs.
+
+Logging a full session ID would expose its credential, while a display name
+would contradict anonymous participation. [ADR 003](docs/adr-003-operational-identity.md)
+therefore chooses a short hash of the high-entropy session ID plus the stable
+anonymous label. Red contracts
+[`9cd3823`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/9cd3823)
+and
+[`a627fc1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/a627fc1)
+then forced denied and invalid actions into view. The corrections in
+[`52be28e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/52be28e)
+and
+[`ad54a38`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/ad54a38)
+fixed my success-only first cut without storing rejected drafts. The final
+check is operational: two fresh sessions act on shared state while a log tail,
+not my own UI, identifies each actor and outcome.

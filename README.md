@@ -2,17 +2,14 @@
 
 ## The argument
 
-StudyNow is a live learning commons for a course, school or open community. A
-member can ask under a stable pseudonym, several people can answer the same
-question, and the explanations remain attached to that question after the
-session ends. It is designed for the moment when a learner is willing to admit
-confusion, but not willing to perform that confusion in front of a class or an
-endless social feed.
+StudyNow is a live learning commons where a member can ask under a stable
+pseudonym, peers offer several explanations, and the group retains them. It
+serves the moment a learner will admit confusion without performing it before
+a class or social feed.
 
-Good does not mean the largest education platform or the fastest automatic
-answer. It means a small group can make uncertainty visible without making a
-person feel exposed, then turn the help they give each other into memory that
-later learners can find and trust.
+Good means a small group can make uncertainty visible without exposing someone,
+then retain its help as trusted memory. It does not mean the largest platform
+or fastest automatic answer.
 
 ## What good means here
 
@@ -44,20 +41,21 @@ forms more predictable informed the deliberately plain contribution forms.
 
 ## What the current build protects
 
-StudyNow enforces persistent groups, invitation membership, public discovery,
-anonymous questions, and independent answers.
-SQLite writes to the Fly volume rather than process memory. Contract tests use
-independent sessions to prove that private groups stay private,
-membership changes access, anonymous posts do not reveal a chosen display
-name, two people can answer one question, and their work survives a reload.
+StudyNow persists groups, invitation membership, anonymous questions and
+independent answers in SQLite on Fly's volume. Contract tests prove private
+groups stay private, membership changes access, anonymous posts hide a chosen
+display name, and two people's work survives a reload.
 
 The real-time layer broadcasts only work that has already been committed to
 SQLite. Open group pages receive new questions and answer counts; open question
-pages receive new explanations, normally within a second and without a reload.
-An aggregate presence count says that other learners are here without naming
-them. Drafts remain local. If the connection drops, the interface says so,
-reconnects automatically and synchronises the visible regions from durable
-storage.
+pages receive new explanations within a second without reloading. Aggregate
+presence shows that peers are here without naming them. Drafts stay local;
+reconnection restores visible regions from durable storage.
+
+Every core write emits a structured `studynow.activity` line after server-side
+checks. It correlates a pseudonymous actor with resource IDs and an outcome,
+never cookies, invite codes, names or contribution text. Production activity is
+live through `mise exec -- flyctl logs -a comp4020-final-xty116`.
 
 ## What I chose not to build
 
