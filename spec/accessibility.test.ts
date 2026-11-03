@@ -22,9 +22,9 @@ it("gives newcomers labelled controls and semantic pages at every core entry poi
     });
     try {
       dom.window.eval(axe.source);
-      const result: AxeResults = await dom.window.eval(
+      const result = (await dom.window.eval(
         'axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa"] }, rules: { "color-contrast": { enabled: false } } })',
-      );
+      )) as AxeResults;
       expect(
         result.violations.map((violation) => ({
           id: violation.id,

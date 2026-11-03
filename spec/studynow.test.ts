@@ -1,4 +1,5 @@
 import { expect, inject, it } from "vitest";
+import { JSDOM } from "jsdom";
 
 const baseUrl = inject("baseUrl");
 
@@ -34,7 +35,8 @@ async function post(
 
 function idFrom(location: string | null, kind: "groups" | "questions"): number {
   const match = location?.match(new RegExp(`/${kind}/(\\d+)`));
-  if (!match) throw new Error(`No ${kind} id in redirect: ${location ?? "missing"}`);
+  if (!match)
+    throw new Error(`No ${kind} id in redirect: ${location ?? "missing"}`);
   return Number(match[1]);
 }
 
@@ -55,22 +57,38 @@ async function waitForServerEvent(
         const frame = buffer.slice(0, boundary);
         buffer = buffer.slice(boundary + 2);
         const lines = frame.split("\n");
-        const name = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
-        const data = lines.find((line) => line.startsWith("data:"))?.slice(5).trim();
-        if (name === eventName && data) return JSON.parse(data) as Record<string, unknown>;
+        const name = lines
+          .find((line) => line.startsWith("event:"))
+          ?.slice(6)
+          .trim();
+        const data = lines
+          .find((line) => line.startsWith("data:"))
+          ?.slice(5)
+          .trim();
+        if (name === eventName && data)
+          return JSON.parse(data) as Record<string, unknown>;
         continue;
       }
 
       const chunk = await reader.read();
-      if (chunk.done) throw new Error(`Realtime stream ended before ${eventName}`);
-      buffer += decoder.decode(chunk.value, { stream: true }).replace(/\r\n/g, "\n");
+      if (chunk.done)
+        throw new Error(`Realtime stream ended before ${eventName}`);
+      buffer += decoder
+        .decode(chunk.value, { stream: true })
+        .replace(/\r\n/g, "\n");
     }
   };
 
   return Promise.race([
     readEvent(),
     new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(`${eventName} did not arrive within ${timeoutMs}ms`)), timeoutMs);
+      setTimeout(
+        () =>
+          reject(
+            new Error(`${eventName} did not arrive within ${timeoutMs}ms`),
+          ),
+        timeoutMs,
+      );
     }),
   ]).finally(() => reader.cancel());
 }
@@ -80,7 +98,9 @@ it("supports a private, persistent, anonymous multi-person study flow", async ()
   const owner = await newSession();
   const learner = await newSession();
 
-  const profile = await post("/api/profile", owner, { displayName: `Visible Owner ${suffix}` });
+  const profile = await post("/api/profile", owner, {
+    displayName: `Visible Owner ${suffix}`,
+  });
   expect(profile.status).toBe(303);
 
   const created = await post("/api/groups", owner, {
@@ -98,15 +118,22 @@ it("supports a private, persistent, anonymous multi-person study flow", async ()
   });
   expect(ownerView.status).toBe(200);
   const ownerHtml = await ownerView.text();
-  const inviteCode = ownerHtml.match(/data-invite-code>([A-Z0-9]{6})</)?.[1];
+  const inviteCode = new JSDOM(ownerHtml).window.document
+    .querySelector("[data-invite-code]")
+    ?.textContent?.trim();
   expect(inviteCode).toBeTruthy();
 
-  const hiddenFromStranger = await fetch(new URL(`/groups/${groupId}`, baseUrl), {
-    headers: { cookie: learner },
-  });
+  const hiddenFromStranger = await fetch(
+    new URL(`/groups/${groupId}`, baseUrl),
+    {
+      headers: { cookie: learner },
+    },
+  );
   expect(hiddenFromStranger.status).toBe(404);
 
-  const joined = await post("/api/groups/join", learner, { inviteCode: inviteCode! });
+  const joined = await post("/api/groups/join", learner, {
+    inviteCode: inviteCode!,
+  });
   expect(joined.status).toBe(303);
   expect(idFrom(joined.headers.get("location"), "groups")).toBe(groupId);
 
@@ -118,16 +145,24 @@ it("supports a private, persistent, anonymous multi-person study flow", async ()
   expect(asked.status).toBe(303);
   const questionId = idFrom(asked.headers.get("location"), "questions");
 
-  const firstAnswer = await post(`/api/questions/${questionId}/answers`, owner, {
-    body: "Process memory disappears when the server restarts.",
-    anonymous: "on",
-  });
+  const firstAnswer = await post(
+    `/api/questions/${questionId}/answers`,
+    owner,
+    {
+      body: "Process memory disappears when the server restarts.",
+      anonymous: "on",
+    },
+  );
   expect(firstAnswer.status).toBe(303);
 
-  const secondAnswer = await post(`/api/questions/${questionId}/answers`, learner, {
-    body: "Durable storage survives because it is written outside the process.",
-    anonymous: "on",
-  });
+  const secondAnswer = await post(
+    `/api/questions/${questionId}/answers`,
+    learner,
+    {
+      body: "Durable storage survives because it is written outside the process.",
+      anonymous: "on",
+    },
+  );
   expect(secondAnswer.status).toBe(303);
 
   const persisted = await fetch(new URL(`/questions/${questionId}`, baseUrl), {
@@ -137,7 +172,9 @@ it("supports a private, persistent, anonymous multi-person study flow", async ()
   const html = await persisted.text();
   expect(html).toContain(`Why does this persist? ${suffix}`);
   expect(html).toContain("Process memory disappears when the server restarts.");
-  expect(html).toContain("Durable storage survives because it is written outside the process.");
+  expect(html).toContain(
+    "Durable storage survives because it is written outside the process.",
+  );
   expect(html).not.toContain(`Visible Owner ${suffix}`);
 });
 
@@ -185,26 +222,38 @@ it("delivers a new question to another open session within one second", async ()
     name: `Realtime Contract ${suffix}`,
     institution: "Test University",
     courseCode: `LIVE${suffix}`,
-    description: "A private room used to verify live delivery between two sessions.",
+    description:
+      "A private room used to verify live delivery between two sessions.",
     visibility: "private",
   });
   const groupId = idFrom(created.headers.get("location"), "groups");
   const ownerView = await fetch(new URL(`/groups/${groupId}`, baseUrl), {
     headers: { cookie: owner },
   });
-  const inviteCode = (await ownerView.text()).match(/data-invite-code>([A-Z0-9]{6})</)?.[1];
+  const inviteCode = new JSDOM(await ownerView.text()).window.document
+    .querySelector("[data-invite-code]")
+    ?.textContent?.trim();
   expect(inviteCode).toBeTruthy();
 
-  const hiddenStream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
-    headers: { cookie: learner },
-  });
+  const hiddenStream = await fetch(
+    new URL(`/api/groups/${groupId}/events`, baseUrl),
+    {
+      headers: { cookie: learner },
+    },
+  );
   expect(hiddenStream.status).toBe(404);
 
-  expect((await post("/api/groups/join", learner, { inviteCode: inviteCode! })).status).toBe(303);
+  expect(
+    (await post("/api/groups/join", learner, { inviteCode: inviteCode! }))
+      .status,
+  ).toBe(303);
 
-  const stream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
-    headers: { cookie: learner },
-  });
+  const stream = await fetch(
+    new URL(`/api/groups/${groupId}/events`, baseUrl),
+    {
+      headers: { cookie: learner },
+    },
+  );
   expect(stream.status).toBe(200);
   expect(stream.headers.get("content-type")).toContain("text/event-stream");
 
@@ -222,9 +271,12 @@ it("delivers a new question to another open session within one second", async ()
   expect(performance.now() - startedAt).toBeLessThan(1_000);
   expect(event).toMatchObject({ groupId, questionId });
 
-  const answerStream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
-    headers: { cookie: learner },
-  });
+  const answerStream = await fetch(
+    new URL(`/api/groups/${groupId}/events`, baseUrl),
+    {
+      headers: { cookie: learner },
+    },
+  );
   expect(answerStream.status).toBe(200);
   const liveAnswer = waitForServerEvent(answerStream, "answer.created");
   const answerStartedAt = performance.now();
@@ -243,30 +295,54 @@ it("shares only an anonymous count when several learners are present", async () 
   const suffix = crypto.randomUUID().slice(0, 8);
   const owner = await newSession();
   const learner = await newSession();
-  expect((await post("/api/profile", owner, { displayName: `Named Owner ${suffix}` })).status).toBe(303);
-  expect((await post("/api/profile", learner, { displayName: `Named Learner ${suffix}` })).status).toBe(303);
+  expect(
+    (
+      await post("/api/profile", owner, {
+        displayName: `Named Owner ${suffix}`,
+      })
+    ).status,
+  ).toBe(303);
+  expect(
+    (
+      await post("/api/profile", learner, {
+        displayName: `Named Learner ${suffix}`,
+      })
+    ).status,
+  ).toBe(303);
 
   const created = await post("/api/groups", owner, {
     name: `Presence Contract ${suffix}`,
     institution: "Test University",
     courseCode: `HERE${suffix}`,
-    description: "A private room used to verify anonymous presence between two sessions.",
+    description:
+      "A private room used to verify anonymous presence between two sessions.",
     visibility: "private",
   });
   const groupId = idFrom(created.headers.get("location"), "groups");
   const ownerView = await fetch(new URL(`/groups/${groupId}`, baseUrl), {
     headers: { cookie: owner },
   });
-  const inviteCode = (await ownerView.text()).match(/data-invite-code>([A-Z0-9]{6})</)?.[1];
+  const inviteCode = new JSDOM(await ownerView.text()).window.document
+    .querySelector("[data-invite-code]")
+    ?.textContent?.trim();
   expect(inviteCode).toBeTruthy();
-  expect((await post("/api/groups/join", learner, { inviteCode: inviteCode! })).status).toBe(303);
+  expect(
+    (await post("/api/groups/join", learner, { inviteCode: inviteCode! }))
+      .status,
+  ).toBe(303);
 
-  const ownerStream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
-    headers: { cookie: owner },
-  });
-  const learnerStream = await fetch(new URL(`/api/groups/${groupId}/events`, baseUrl), {
-    headers: { cookie: learner },
-  });
+  const ownerStream = await fetch(
+    new URL(`/api/groups/${groupId}/events`, baseUrl),
+    {
+      headers: { cookie: owner },
+    },
+  );
+  const learnerStream = await fetch(
+    new URL(`/api/groups/${groupId}/events`, baseUrl),
+    {
+      headers: { cookie: learner },
+    },
+  );
   const presence = await waitForServerEvent(learnerStream, "presence.changed");
 
   expect(presence).toMatchObject({ groupId, activeLearners: 2 });

@@ -108,6 +108,8 @@ it("uses a model response, rejects invented or inaccessible citations and surviv
         title: "SecretCourseQuestionSentinel",
         body: "Private reasoning must never be sent for a non-member.",
         anonymous: "on",
+        drawingData: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWPQjbT/D8IMMAYAOuoHEd0WK4EAAAAASUVORK5CYII=",
+        attachmentAlt: "A small private handwritten diagram",
       }),
     );
     const result = await (
@@ -136,7 +138,15 @@ it("uses a model response, rejects invented or inaccessible citations and surviv
       headers: { cookie: owner },
     });
     expect(persisted.status).toBe(200);
-    expect(await persisted.text()).toContain("SecretCourseQuestionSentinel");
+    const persistedHtml = await persisted.text();
+    expect(persistedHtml).toContain("SecretCourseQuestionSentinel");
+    const attachmentPath = persistedHtml.match(/src="(\/api\/attachments\/[^"]+)"/)?.[1];
+    expect(attachmentPath).toBeTruthy();
+    const attachment = await fetch(base + attachmentPath, { headers: { cookie: owner } });
+    expect(attachment.status).toBe(200);
+    expect(attachment.headers.get("content-type")).toBe("image/png");
+    expect((await attachment.arrayBuffer()).byteLength).toBeGreaterThan(50);
+    expect((await fetch(base + attachmentPath, { headers: { cookie: stranger } })).status).toBe(404);
     expect(
       (
         await fetch(`${base}/questions/${privateId}`, {

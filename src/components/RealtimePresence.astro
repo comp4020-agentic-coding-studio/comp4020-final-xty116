@@ -1,27 +1,34 @@
 ---
 interface Props {
   groupId: number;
-  mode: "group" | "question" | "commons";
+  mode: "group" | "question" | "commons" | "search";
   questionId?: number;
 }
 
 const { groupId, mode, questionId } = Astro.props;
 const regions =
-  mode === "commons"
-    ? "[data-room-grid]|[data-room-total]|[data-public-room-grid]|[data-open-threads]"
-    : mode === "group"
-      ? "[data-group-stats]|[data-question-total]|[data-question-feed-content]|[data-invite-state]"
-      : "[data-question-summary]|[data-answer-shared-total]|[data-answers-title]|[data-answer-list]";
+  mode === "search"
+    ? ""
+    : mode === "commons"
+      ? "[data-room-grid]|[data-room-total]|[data-public-room-grid]|[data-open-threads]"
+      : mode === "group"
+        ? "[data-group-stats]|[data-question-total]|[data-question-feed-content]|[data-invite-state]"
+        : "[data-question-summary]|[data-answer-shared-total]|[data-answers-title]|[data-answer-list]|[data-question-member-count]";
 ---
 
 <section
   class:list={[
     "realtime-panel",
-    { compact: mode === "question", "commons-realtime": mode === "commons" },
+    {
+      compact: mode === "question",
+      "commons-realtime": mode === "commons" || mode === "search",
+    },
   ]}
   data-realtime
   data-stream-url={
-    mode === "commons" ? "/api/events" : `/api/groups/${groupId}/events`
+    mode === "commons" || mode === "search"
+      ? "/api/events"
+      : `/api/groups/${groupId}/events`
   }
   data-realtime-mode={mode}
   data-question-id={questionId}
@@ -61,7 +68,8 @@ const regions =
     const streamUrl = root.dataset.streamUrl;
     const mode = root.dataset.realtimeMode;
     const questionId = Number(root.dataset.questionId);
-    const selectors = root.dataset.liveRegions?.split("|") ?? [];
+    const selectors =
+      root.dataset.liveRegions?.split("|").filter(Boolean) ?? [];
     const label = root.querySelector<HTMLElement>("[data-live-label]");
     const dot = root.querySelector<HTMLElement>("[data-live-dot]");
     const count = root.querySelector<HTMLElement>("[data-presence-count]");
@@ -89,6 +97,7 @@ const regions =
     };
 
     const refreshOnce = async () => {
+      if (selectors.length === 0) return;
       const response = await fetch(window.location.href, {
         cache: "no-store",
         headers: { "x-studynow-sync": "partial" },
@@ -136,6 +145,8 @@ const regions =
     source.addEventListener("error", () => setConnection("reconnecting"));
     source.addEventListener("ready", () => {
       void syncRegions();
+      if (mode === "search")
+        document.dispatchEvent(new Event("studynow:commons"));
     });
     source.addEventListener("presence.changed", (event) => {
       const activeLearners = payload(event).activeLearners ?? 0;
@@ -163,6 +174,8 @@ const regions =
     });
     source.addEventListener("commons.changed", () => {
       void syncRegions();
+      if (mode === "search")
+        document.dispatchEvent(new Event("studynow:commons"));
     });
 
     window.addEventListener("pagehide", () => source.close(), { once: true });

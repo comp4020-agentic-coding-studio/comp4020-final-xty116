@@ -1,5 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import RealtimePresence from "../components/RealtimePresence.astro";
 import { keywordSearch } from "../lib/search";
 import { getOrCreateViewer } from "../lib/session";
 import { getGroup } from "../lib/db";
@@ -18,6 +19,7 @@ const result =
 ---
 
 <Layout title="Find understanding | StudyNow" {viewer} active="search">
+  <RealtimePresence groupId={0} mode="search" />
   <div class="workspace-shell search-shell">
     <header class="search-heading">
       <span class="icon-tile blue">
@@ -106,12 +108,16 @@ const result =
     </p>
     <div class="search-results" data-search-results>
       {result?.results.map((item) => (
-        <a class="search-result" href={`/questions/${item.id}`}>
+        <a
+          class="search-result"
+          href={`/questions/${item.id}`}
+          data-result-id={item.id}
+        >
           <div class="result-meta">
             <span>
               {item.courseCode} · {item.groupName}
             </span>
-            <span>{item.answerCount} explanations</span>
+            <span data-result-count>{item.answerCount} explanations</span>
           </div>
           <h2>{item.title}</h2>
           <p>{excerpt(item.body, 260)}</p>
@@ -135,76 +141,5 @@ const result =
   </div>
 </Layout>
 <script>
-  const form = document.querySelector<HTMLFormElement>(
-    "[data-knowledge-search]",
-  )!;
-  const query = form.querySelector<HTMLInputElement>("[name=q]")!;
-  const results = document.querySelector<HTMLElement>("[data-search-results]")!;
-  const status = document.querySelector<HTMLElement>(
-    "[data-search-status] span",
-  )!;
-  const loading = document.querySelector<HTMLElement>("[data-search-loading]")!;
-  const button = form.querySelector<HTMLButtonElement>("[type=submit]")!;
-  document
-    .querySelectorAll<HTMLButtonElement>("[data-search-suggestion]")
-    .forEach((suggestion) =>
-      suggestion.addEventListener("click", () => {
-        query.value = suggestion.dataset.searchSuggestion!;
-        form.requestSubmit();
-      }),
-    );
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    loading.hidden = false;
-    button.disabled = true;
-    results.setAttribute("aria-busy", "true");
-    const fields = new FormData(form);
-    try {
-      const response = await fetch("/api/search", {
-        method: "POST",
-        body: fields,
-      });
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(
-          data.error ?? "Search is unavailable. Try again shortly.",
-        );
-      status.textContent = `${data.mode === "ai" ? "AI matched · " : "Keyword · "}${data.message}`;
-      results.replaceChildren();
-      for (const item of data.results) {
-        const link = document.createElement("a"),
-          meta = document.createElement("div"),
-          heading = document.createElement("h2"),
-          body = document.createElement("p");
-        link.className = "search-result";
-        link.href = `/questions/${Number(item.id)}`;
-        meta.className = "result-meta";
-        meta.textContent = `${item.courseCode} · ${item.groupName} · ${item.answerCount} explanations`;
-        heading.textContent = item.title;
-        body.textContent =
-          item.body.length > 260 ? item.body.slice(0, 260) + "..." : item.body;
-        link.append(meta, heading, body);
-        if (item.reason) {
-          const reason = document.createElement("div");
-          reason.className = "match-reason";
-          reason.textContent = `Related idea: ${item.reason}`;
-          link.append(reason);
-        }
-        results.append(link);
-      }
-      const url = new URL(window.location.href);
-      url.searchParams.set("q", query.value);
-      history.replaceState({}, "", url);
-      document.querySelector(".search-suggestions")?.remove();
-    } catch (error) {
-      status.textContent =
-        error instanceof Error
-          ? error.message
-          : "Search interrupted. Your query is still here.";
-    } finally {
-      loading.hidden = true;
-      button.disabled = false;
-      results.removeAttribute("aria-busy");
-    }
-  });
+  import "../lib/search-client";
 </script>

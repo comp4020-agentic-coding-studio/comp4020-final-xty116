@@ -2,7 +2,7 @@ import { expect, inject, it } from "vitest";
 
 const baseUrl = inject("baseUrl");
 const png = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6jVkAAAAASUVORK5CYII=",
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWPQjbT/D8IMMAYAOuoHEd0WK4EAAAAASUVORK5CYII=",
   "base64",
 );
 async function session() {
@@ -94,4 +94,48 @@ it("persists image and handwritten explanations and protects private attachments
   expect(
     (await revisited.text()).match(/src="\/api\/attachments\//g),
   ).toHaveLength(3);
+});
+
+it("rejects images whose headers look valid but whose pixels cannot be decoded", async () => {
+  const owner = await session();
+  const groupId = id(
+    await post("/api/groups", owner, {
+      name: "Media validation room",
+      institution: "ANU",
+      courseCode: "MATH1013",
+      description:
+        "Check that an image is an actual explanation rather than broken bytes.",
+      visibility: "private",
+    }),
+  );
+  const truncated = Buffer.alloc(24);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(truncated);
+  truncated.writeUInt32BE(2, 16);
+  truncated.writeUInt32BE(2, 20);
+  const form = new FormData();
+  form.set("title", "This truncated file must be rejected");
+  form.set("body", "");
+  form.set("attachmentAlt", "A deliberately damaged test diagram");
+  form.set(
+    "images",
+    new Blob([truncated], { type: "image/png" }),
+    "broken.png",
+  );
+  const response = await fetch(
+    new URL(`/api/groups/${groupId}/questions`, baseUrl),
+    {
+      method: "POST",
+      redirect: "manual",
+      headers: { cookie: owner, origin: new URL(baseUrl).origin },
+      body: form,
+    },
+  );
+  expect(response.status).toBe(303);
+  expect(response.headers.get("location")).toContain("error=");
+  const room = await fetch(new URL(`/groups/${groupId}`, baseUrl), {
+    headers: { cookie: owner },
+  });
+  expect(await room.text()).not.toContain(
+    "This truncated file must be rejected",
+  );
 });

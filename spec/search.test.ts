@@ -69,6 +69,11 @@ it("searches question and answer text without revealing another course's private
     groupId: String(groupId),
   });
   expect((await deniedScope.json()).results).toEqual([]);
+  const hiddenMetadata = await post("/api/search", stranger, {
+    mode: "refresh",
+    ids: String(questionId),
+  });
+  expect((await hiddenMetadata.json()).results).toEqual([]);
   const changes = await Promise.all([
     post(`/api/questions/${questionId}/answers`, owner, {
       body: "A base case terminates the process without another call.",
@@ -80,6 +85,13 @@ it("searches question and answer text without revealing another course's private
     }),
   ]);
   expect(changes.every((response) => response.status === 303)).toBe(true);
+  const currentMetadata = await post("/api/search", owner, {
+    mode: "refresh",
+    ids: String(questionId),
+  });
+  expect((await currentMetadata.json()).results).toEqual([
+    { id: questionId, answerCount: 3, resolved: false },
+  ]);
   expect(
     (
       await post(`/api/questions/${questionId}/resolve`, stranger, {

@@ -280,3 +280,17 @@ it("accounts for identity changes, invalid invitations and rejected answers", as
   expect(output).not.toContain(rejectedAnswer);
   expect(output).not.toContain(invalidInvite);
 });
+
+it("records denied status changes using the same operational identity as other actions", async () => {
+  const owner = await newSession(), stranger = await newSession();
+  const before = (await activityEvents(11)).length;
+  const created = await post("/api/groups", owner, { name: "Status activity contract", institution: "ANU", courseCode: "TEST1000", description: "Record who attempted to change another learner's question.", visibility: "private" });
+  const groupId = idFrom(created, "groups");
+  const asked = await post(`/api/groups/${groupId}/questions`, owner, { title: "Who can mark this question understood?", body: "Only its author or the room organiser can change the status.", anonymous: "on" });
+  const questionId = idFrom(asked, "questions");
+  const denied = await post(`/api/questions/${questionId}/resolve`, stranger, { resolved: "1" });
+  expect(denied.status).toBe(403);
+  const events = await activityEvents(before + 3);
+  expect(events).toEqual(expect.arrayContaining([expect.objectContaining({ action: "question.resolved", result: "denied", groupId, questionId })]));
+  expect(output).not.toContain(stranger.split("=", 2)[1]);
+});

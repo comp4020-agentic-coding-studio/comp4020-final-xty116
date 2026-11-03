@@ -1,8 +1,13 @@
 import type { AttachmentInput } from "./db";
 import { ValidationError } from "./http";
+import sharp from "sharp";
+
+sharp.cache({ memory: 8, files: 0, items: 10 });
+sharp.concurrency(1);
 
 const MAX_IMAGE = 2 * 1024 * 1024;
 const MAX_REQUEST = 8 * 1024 * 1024;
+let decodeQueue: Promise<void> = Promise.resolve();
 
 export async function contributionForm(request: Request): Promise<FormData> {
   if (Number(request.headers.get("content-length")) > MAX_REQUEST)
@@ -52,6 +57,23 @@ function imageMime(data: Buffer): string | undefined {
   return undefined;
 }
 
+async function validateImage(data: Buffer): Promise<void> {
+  const validation = decodeQueue.then(async () => {
+    try {
+      await sharp(data, { limitInputPixels: 24_000_000, failOn: "warning" })
+        .resize(1, 1)
+        .raw()
+        .toBuffer();
+    } catch {
+      throw new ValidationError(
+        "This image is damaged, incomplete or larger than 24 megapixels. Choose another PNG, JPEG or WebP image.",
+      );
+    }
+  });
+  decodeQueue = validation.catch(() => {});
+  await validation;
+}
+
 export async function contributionContent(
   form: FormData,
   maxText: number,
@@ -85,6 +107,7 @@ export async function contributionContent(
       throw new ValidationError(
         "Use a PNG, JPEG or WebP image. SVG and other file types are not supported.",
       );
+    await validateImage(data);
     attachments.push({ data, mime, alt, kind: "image" });
   }
   if (hasDrawing) {
@@ -101,6 +124,7 @@ export async function contributionContent(
       throw new ValidationError(
         "The sketch could not be read. Please redraw it.",
       );
+    await validateImage(data);
     attachments.push({ data, mime: "image/png", alt, kind: "drawing" });
   }
   if (!attachments.length && body.length < 8)

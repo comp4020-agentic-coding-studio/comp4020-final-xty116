@@ -396,8 +396,8 @@ const id = isQuestion ? "question-composer" : "answer-composer";
               field.checked = Boolean(value);
           }
           if (saved.drawing?.length) {
-            previousWidth = saved.width;
-            pad.fromData(saved.drawing);
+            const savedWidth = Number(saved.width) || 300;
+            previousWidth = 0;
             const panel = form.querySelector<HTMLElement>(
               "[data-media-panel=drawing]",
             )!;
@@ -405,7 +405,18 @@ const id = isQuestion ? "question-composer" : "answer-composer";
             form
               .querySelector("[data-composer-tab=drawing]")
               ?.setAttribute("aria-expanded", "true");
-            requestAnimationFrame(resize);
+            requestAnimationFrame(() => {
+              resize();
+              const scale = previousWidth / savedWidth;
+              const groups = saved.drawing as PointGroup[];
+              for (const group of groups)
+                for (const point of group.points) {
+                  point.x *= scale;
+                  point.y *= scale;
+                }
+              pad.fromData(groups);
+              syncSketch();
+            });
           }
           draftStatus.textContent = "Draft restored";
           restoring = false;
