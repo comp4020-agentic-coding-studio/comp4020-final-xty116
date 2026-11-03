@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { randomBytes, randomUUID } from "node:crypto";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
 
@@ -63,7 +64,40 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS idx_memberships_session ON memberships(session_id);
   CREATE INDEX IF NOT EXISTS idx_questions_group ON questions(group_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_answers_question ON answers(question_id, created_at ASC);
+
+  CREATE TABLE IF NOT EXISTS attachments (
+    id TEXT PRIMARY KEY,
+    question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+    answer_id INTEGER REFERENCES answers(id) ON DELETE CASCADE,
+    mime TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('image', 'drawing')),
+    alt TEXT NOT NULL,
+    data BLOB NOT NULL,
+    CHECK ((question_id IS NOT NULL) != (answer_id IS NOT NULL))
+  );
+  CREATE TABLE IF NOT EXISTS course_invites (
+    token TEXT PRIMARY KEY,
+    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    accepted_by TEXT REFERENCES sessions(id),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(group_id, label)
+  );
+  CREATE TABLE IF NOT EXISTS search_usage (
+    viewer_id TEXT NOT NULL REFERENCES sessions(id),
+    occurred_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_search_usage_time ON search_usage(occurred_at);
 `);
+
+const groupColumns = sqlite.pragma("table_info(groups)") as { name: string }[];
+if (!groupColumns.some(column => column.name === "kind")) {
+  sqlite.exec("ALTER TABLE groups ADD COLUMN kind TEXT NOT NULL DEFAULT 'study'");
+}
+const questionColumns = sqlite.pragma("table_info(questions)") as { name: string }[];
+if (!questionColumns.some(column => column.name === "resolved")) {
+  sqlite.exec("ALTER TABLE questions ADD COLUMN resolved INTEGER NOT NULL DEFAULT 0");
+}
 
 export interface Viewer {
   id: string;
@@ -84,6 +118,7 @@ export interface GroupSummary {
   questionCount: number;
   isMember: boolean;
   isOwner: boolean;
+  kind: "study" | "course";
 }
 
 export interface QuestionSummary {
@@ -95,6 +130,8 @@ export interface QuestionSummary {
   anonymous: boolean;
   createdAt: string;
   answerCount: number;
+  resolved: boolean;
+  attachments: AttachmentView[];
 }
 
 export interface AnswerView {
@@ -103,7 +140,11 @@ export interface AnswerView {
   authorName: string;
   anonymous: boolean;
   createdAt: string;
+  attachments: AttachmentView[];
 }
+
+export interface AttachmentInput { mime: string; kind: "image" | "drawing"; alt: string; data: Buffer }
+export interface AttachmentView { id: string; mime: string; kind: "image" | "drawing"; alt: string }
 
 export interface QuestionView extends QuestionSummary {
   group: GroupSummary;
@@ -126,6 +167,7 @@ const groupSelect = `
     g.course_code AS courseCode,
     g.description,
     g.visibility,
+    g.kind,
     g.invite_code AS inviteCode,
     g.created_at AS createdAt,
     (SELECT COUNT(*) FROM memberships m WHERE m.group_id = g.id) AS memberCount,
@@ -143,7 +185,25 @@ function mapGroup(row: GroupRow): GroupSummary {
 }
 
 function mapQuestion(row: QuestionRow): QuestionSummary {
-  return { ...row, anonymous: Boolean(row.anonymous) };
+  return { ...row, anonymous: Boolean(row.anonymous), resolved: Boolean(row.resolved), attachments: listAttachments("question_id", row.id) };
+}
+
+function listAttachments(column: "question_id" | "answer_id", id: number): AttachmentView[] {
+  return sqlite.prepare(`SELECT id, mime, kind, alt FROM attachments WHERE ${column} = ?`).all(id) as AttachmentView[];
+}
+
+function saveAttachments(column: "question_id" | "answer_id", id: number, attachments: AttachmentInput[]): void {
+  const insert = sqlite.prepare(`INSERT INTO attachments (id, ${column}, mime, kind, alt, data) VALUES (?, ?, ?, ?, ?, ?)`);
+  for (const item of attachments) insert.run(randomUUID(), id, item.mime, item.kind, item.alt, item.data);
+}
+
+export function getAttachment(id: string, viewerId: string): (AttachmentView & { data: Buffer }) | undefined {
+  return sqlite.prepare(`SELECT f.id, f.mime, f.kind, f.alt, f.data
+    FROM attachments f LEFT JOIN answers a ON a.id = f.answer_id
+    JOIN questions q ON q.id = COALESCE(f.question_id, a.question_id)
+    JOIN groups g ON g.id = q.group_id
+    WHERE f.id = ? AND (g.visibility = 'public' OR EXISTS
+      (SELECT 1 FROM memberships m WHERE m.group_id = g.id AND m.session_id = ?))`).get(id, viewerId) as (AttachmentView & { data: Buffer }) | undefined;
 }
 
 function makeSeedData(): void {
@@ -284,13 +344,14 @@ export function createGroup(input: {
   description: string;
   visibility: "public" | "private";
   inviteCode: string;
+  kind?: "study" | "course";
 }): number {
   return sqlite.transaction(() => {
     const result = sqlite
       .prepare(
         `INSERT INTO groups
-          (name, institution, course_code, description, visibility, invite_code, owner_session_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          (name, institution, course_code, description, visibility, invite_code, owner_session_id, kind)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.name,
@@ -300,6 +361,7 @@ export function createGroup(input: {
         input.visibility,
         input.inviteCode,
         input.viewerId,
+        input.kind ?? "study",
       );
     const groupId = Number(result.lastInsertRowid);
     sqlite
@@ -353,6 +415,7 @@ export function listQuestions(groupId: number): QuestionSummary[] {
          q.group_id AS groupId,
          q.title,
          q.body,
+         q.resolved,
          CASE WHEN q.anonymous = 1 THEN s.anon_label ELSE s.display_name END AS authorName,
          q.anonymous,
          q.created_at AS createdAt,
@@ -372,15 +435,20 @@ export function createQuestion(input: {
   title: string;
   body: string;
   anonymous: boolean;
+  attachments?: AttachmentInput[];
 }): number | undefined {
   if (!isMember(input.groupId, input.viewerId)) return undefined;
-  const result = sqlite
+  return sqlite.transaction(() => {
+    const result = sqlite
     .prepare(
       `INSERT INTO questions (group_id, author_session_id, title, body, anonymous)
        VALUES (?, ?, ?, ?, ?)`,
     )
     .run(input.groupId, input.viewerId, input.title, input.body, Number(input.anonymous));
-  return Number(result.lastInsertRowid);
+    const id = Number(result.lastInsertRowid);
+    saveAttachments("question_id", id, input.attachments ?? []);
+    return id;
+  })();
 }
 
 export function getQuestion(questionId: number, viewerId: string): QuestionView | undefined {
@@ -391,6 +459,7 @@ export function getQuestion(questionId: number, viewerId: string): QuestionView 
          q.group_id AS groupId,
          q.title,
          q.body,
+         q.resolved,
          CASE WHEN q.anonymous = 1 THEN s.anon_label ELSE s.display_name END AS authorName,
          q.anonymous,
          q.created_at AS createdAt,
@@ -428,7 +497,7 @@ export function getQuestion(questionId: number, viewerId: string): QuestionView 
   return {
     ...mapQuestion(row),
     group,
-    answers: answers.map((answer) => ({ ...answer, anonymous: Boolean(answer.anonymous) })),
+    answers: answers.map((answer) => ({ ...answer, anonymous: Boolean(answer.anonymous), attachments: listAttachments("answer_id", answer.id) })),
   };
 }
 
@@ -437,18 +506,87 @@ export function createAnswer(input: {
   viewerId: string;
   body: string;
   anonymous: boolean;
+  attachments?: AttachmentInput[];
 }): number | undefined {
   const question = sqlite
     .prepare("SELECT group_id AS groupId FROM questions WHERE id = ?")
     .get(input.questionId) as { groupId: number } | undefined;
   if (!question || !isMember(question.groupId, input.viewerId)) return undefined;
-  sqlite
+  sqlite.transaction(() => {
+  const result = sqlite
     .prepare(
       `INSERT INTO answers (question_id, author_session_id, body, anonymous)
        VALUES (?, ?, ?, ?)`,
     )
     .run(input.questionId, input.viewerId, input.body, Number(input.anonymous));
+    saveAttachments("answer_id", Number(result.lastInsertRowid), input.attachments ?? []);
+  })();
   return question.groupId;
+}
+
+export interface CourseInvite { token: string; label: string; accepted: boolean }
+export function listCourseInvites(groupId: number, viewerId: string): CourseInvite[] {
+  if (!getGroup(groupId, viewerId)?.isOwner) return [];
+  return (sqlite.prepare("SELECT token, label, accepted_by IS NOT NULL AS accepted FROM course_invites WHERE group_id = ? ORDER BY created_at, label").all(groupId) as { token: string; label: string; accepted: number }[]).map(row => ({ ...row, accepted: Boolean(row.accepted) }));
+}
+export function createCourseInvites(groupId: number, viewerId: string, labels: string[]): boolean {
+  if (!getGroup(groupId, viewerId)?.isOwner) return false;
+  const insert = sqlite.prepare("INSERT INTO course_invites (token, group_id, label) VALUES (?, ?, ?) ON CONFLICT(group_id, label) DO NOTHING");
+  sqlite.transaction(() => { for (const label of labels) insert.run(randomBytes(24).toString("hex"), groupId, label); })();
+  return true;
+}
+export function previewInvite(token: string): { name: string; institution: string; courseCode: string; groupId: number; claimed: boolean } | undefined {
+  return sqlite.prepare(`SELECT g.name, g.institution, g.course_code AS courseCode, g.id AS groupId,
+    i.accepted_by IS NOT NULL AS claimed FROM course_invites i JOIN groups g ON g.id = i.group_id WHERE i.token = ?`).get(token) as { name: string; institution: string; courseCode: string; groupId: number; claimed: boolean } | undefined;
+}
+export function acceptCourseInvite(token: string, viewerId: string): number | undefined {
+  return sqlite.transaction(() => {
+    const invite = sqlite.prepare("SELECT group_id AS groupId, accepted_by AS acceptedBy FROM course_invites WHERE token = ?").get(token) as { groupId: number; acceptedBy: string | null } | undefined;
+    if (!invite || (invite.acceptedBy && invite.acceptedBy !== viewerId)) return undefined;
+    sqlite.prepare("INSERT INTO memberships (group_id, session_id, role) VALUES (?, ?, 'member') ON CONFLICT DO NOTHING").run(invite.groupId, viewerId);
+    sqlite.prepare("UPDATE course_invites SET accepted_by = ? WHERE token = ?").run(viewerId, token);
+    return invite.groupId;
+  })();
+}
+export function setResolved(questionId: number, viewerId: string, resolved: boolean): number | undefined {
+  const result = sqlite.prepare(`UPDATE questions SET resolved = ? WHERE id = ? AND
+    (author_session_id = ? OR group_id IN (SELECT id FROM groups WHERE owner_session_id = ?))`)
+    .run(Number(resolved), questionId, viewerId, viewerId);
+  return result.changes ? questionGroupId(questionId) : undefined;
+}
+export function canManageQuestion(questionId: number, viewerId: string): boolean {
+  return Boolean(sqlite.prepare(`SELECT 1 FROM questions q JOIN groups g ON g.id = q.group_id WHERE q.id = ? AND
+    (q.author_session_id = ? OR g.owner_session_id = ?)`).get(questionId, viewerId, viewerId));
+}
+
+export interface SearchDocument { id: number; title: string; body: string; groupId: number; groupName: string; courseCode: string; answerCount: number; answers: string; resolved: boolean }
+export function searchDocuments(viewerId: string, query: string, groupId?: number): SearchDocument[] {
+  const words = [...new Set(query.toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) ?? [])].slice(0, 16);
+  const rows = sqlite.prepare(`SELECT q.id, q.title, q.body, q.group_id AS groupId, g.name AS groupName, g.course_code AS courseCode, q.resolved,
+    (SELECT COUNT(*) FROM answers a WHERE a.question_id = q.id) AS answerCount,
+    COALESCE((SELECT group_concat(body, '\n') FROM answers WHERE question_id = q.id), '') AS answers
+    FROM questions q JOIN groups g ON g.id = q.group_id
+    WHERE (? IS NULL OR g.id = ?) AND (g.visibility = 'public' OR EXISTS
+      (SELECT 1 FROM memberships m WHERE m.group_id = g.id AND m.session_id = ?))
+    ORDER BY q.id DESC LIMIT 1200`).all(groupId ?? null, groupId ?? null, viewerId) as SearchDocument[];
+  return rows.map(row => {
+    const title = row.title.toLowerCase();
+    const body = `${row.body} ${row.answers}`.toLowerCase();
+    const score = words.reduce((total, word) => total + (title.includes(word) ? 5 : 0) + (body.includes(word) ? 1 : 0), 0);
+    return { ...row, resolved: Boolean(row.resolved), score };
+  }).sort((a, b) => b.score - a.score).slice(0, 40);
+}
+export function consumeSearchAllowance(viewerId: string): boolean {
+  const now = Date.now();
+  return sqlite.transaction(() => {
+    sqlite.prepare("DELETE FROM search_usage WHERE occurred_at < ?").run(now - 86400000);
+    const counts = sqlite.prepare(`SELECT COUNT(*) AS total,
+      SUM(viewer_id = ?) AS personal,
+      SUM(viewer_id = ? AND occurred_at > ?) AS recent FROM search_usage`).get(viewerId, viewerId, now - 60000) as { total: number; personal: number; recent: number };
+    if (counts.total >= 300 || counts.personal >= 40 || counts.recent >= 6) return false;
+    sqlite.prepare("INSERT INTO search_usage (viewer_id, occurred_at) VALUES (?, ?)").run(viewerId, now);
+    return true;
+  })();
 }
 
 export function questionGroupId(questionId: number): number | undefined {

@@ -4,6 +4,7 @@ import { createQuestion, type Viewer } from "../../../../lib/db";
 import { assertSameOrigin, errorResponse, formText, seeOther, ValidationError } from "../../../../lib/http";
 import { publishToGroup } from "../../../../lib/realtime";
 import { getOrCreateViewer } from "../../../../lib/session";
+import { contributionContent, contributionForm } from "../../../../lib/media";
 
 export const prerender = false;
 
@@ -14,12 +15,13 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
   try {
     assertSameOrigin(request);
     viewer = getOrCreateViewer(cookies);
-    const form = await request.formData();
+    const form = await contributionForm(request);
+    const content = await contributionContent(form, 1600);
     const questionId = createQuestion({
       groupId,
       viewerId: viewer.id,
       title: formText(form, "title", { min: 6, max: 140 }),
-      body: formText(form, "body", { min: 12, max: 1600 }),
+      ...content,
       anonymous: form.get("anonymous") === "on",
     });
     if (!questionId) {

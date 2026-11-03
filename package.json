@@ -16,7 +16,9 @@
     "@astrojs/markdown-remark": "7.3.1",
     "@astrojs/node": "^11.1.6",
     "astro": "^7.3.3",
-    "better-sqlite3": "^13.0.3"
+    "better-sqlite3": "^13.0.3",
+    "lucide": "^1.66.0",
+    "signature_pad": "^5.1.4"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

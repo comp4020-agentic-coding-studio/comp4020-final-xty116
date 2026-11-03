@@ -1,6 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import RealtimePresence from "../../components/RealtimePresence.astro";
+import Attachments from "../../components/Attachments.astro";
 import { getQuestion } from "../../lib/db";
 import { formatTimestamp } from "../../lib/format";
 import { getOrCreateViewer } from "../../lib/session";
@@ -37,6 +38,7 @@ const error = Astro.url.searchParams.get("error");
           </header>
           <h1>{question.title}</h1>
           <p class="question-body">{question.body}</p>
+          <Attachments attachments={question.attachments} />
           <footer>
             <span data-question-answer-total>{question.answerCount} {question.answerCount === 1 ? "explanation" : "explanations"}</span>
             <a href={`/groups/${question.group.id}`}>Back to {question.group.courseCode}</a>
@@ -73,6 +75,7 @@ const error = Astro.url.searchParams.get("error");
                     <span>{formatTimestamp(answer.createdAt)}</span>
                   </header>
                   <p>{answer.body}</p>
+                  <Attachments attachments={answer.attachments} />
                   <footer>
                     <span class="avatar small" aria-hidden="true">{answer.authorName.replace("Anonymous ", "").slice(0, 1)}</span>
                     <strong>{answer.authorName}</strong>
