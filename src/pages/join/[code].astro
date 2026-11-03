@@ -1,0 +1,18 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getOrCreateViewer } from "../../lib/session";
+export const prerender = false;
+const viewer = getOrCreateViewer(Astro.cookies);
+const code = Astro.params.code?.toUpperCase() ?? "";
+---
+<Layout title="Join a study group | StudyNow" {viewer}>
+  <section class="invitation-landing">
+    <span class="large-icon"><i data-lucide="users" aria-hidden="true"></i></span>
+    <p class="eyebrow">Your seat is waiting</p><h1>Learn better together.</h1>
+    <p>Join this group as <strong>{viewer.anonLabel}</strong>.</p>
+    <form class="stack-form" method="post" action="/api/groups/join">
+      <label><span>Group invitation code</span><input name="inviteCode" value={code} minlength="6" maxlength="6" required /></label>
+      <button class="primary-button" type="submit">Join group <i data-lucide="arrow-right" aria-hidden="true"></i></button>
+    </form>
+  </section>
+</Layout>

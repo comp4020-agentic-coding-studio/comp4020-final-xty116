@@ -1,6 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import RealtimePresence from "../../components/RealtimePresence.astro";
+import CourseInvites from "../../components/CourseInvites.astro";
 import { getGroup, listQuestions } from "../../lib/db";
 import { excerpt, formatTimestamp } from "../../lib/format";
 import { getOrCreateViewer } from "../../lib/session";
@@ -76,6 +77,7 @@ const error = Astro.url.searchParams.get("error");
         </section>
 
         <aside class="question-sidebar">
+          <CourseInvites {group} viewerId={viewer.id} />
           {group.isOwner && (
             <section class="invite-panel">
               <p class="eyebrow">Invite learners</p>

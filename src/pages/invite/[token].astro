@@ -1,0 +1,22 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { previewInvite } from "../../lib/db";
+import { getOrCreateViewer } from "../../lib/session";
+export const prerender = false;
+const viewer = getOrCreateViewer(Astro.cookies);
+const token = Astro.params.token ?? "";
+const invite = /^[a-f0-9]{48}$/.test(token) ? previewInvite(token) : undefined;
+if (!invite) Astro.response.status = 404;
+---
+<Layout title="Your course invitation | StudyNow" {viewer}>
+  <section class="invitation-landing">
+    <span class="large-icon"><i data-lucide="graduation-cap" aria-hidden="true"></i></span>
+    <p class="eyebrow">A place to figure things out together</p>
+    <h1>{invite ? invite.name : "Invitation unavailable"}</h1>
+    {invite ? <>
+      <p>{invite.institution} · {invite.courseCode}</p>
+      <p>Join as <strong>{viewer.anonLabel}</strong>. Your classmates see that name when you post anonymously.</p>
+      <form method="post" action="/api/invitations/accept"><input type="hidden" name="token" value={token} /><button class="primary-button" type="submit">Accept course invitation <i data-lucide="arrow-right" aria-hidden="true"></i></button></form>
+    </> : <p>Ask your course organiser for a new link.</p>}
+  </section>
+</Layout>

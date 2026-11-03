@@ -3,6 +3,7 @@ import { recordActivity } from "../../../lib/activity";
 import { joinGroup, joinPublicGroup } from "../../../lib/db";
 import { assertSameOrigin, errorResponse, formText, seeOther, ValidationError } from "../../../lib/http";
 import { getOrCreateViewer } from "../../../lib/session";
+import { publishToGroup } from "../../../lib/realtime";
 
 export const prerender = false;
 
@@ -20,6 +21,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         throw new ValidationError("That public group is not available");
       }
       recordActivity(viewer, { action: "group.joined", result: "succeeded", groupId });
+      publishToGroup({ type: "group.changed", groupId });
       return seeOther(`/groups/${groupId}`, { notice: "You joined the group and can now ask or answer." });
     }
 
@@ -30,6 +32,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       throw new ValidationError("That invite code does not match a study group");
     }
     recordActivity(viewer, { action: "group.joined", result: "succeeded", groupId });
+    publishToGroup({ type: "group.changed", groupId });
     return seeOther(`/groups/${groupId}`, { notice: "Invite accepted. You are now a member." });
   } catch (error) {
     return errorResponse(error, "/#join-group");

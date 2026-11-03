@@ -5,6 +5,8 @@ export type ActivityAction =
   | "profile.updated"
   | "group.created"
   | "group.joined"
+  | "group.invited"
+  | "question.resolved"
   | "question.created"
   | "answer.created";
 

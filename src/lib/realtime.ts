@@ -16,7 +16,7 @@ export interface PresenceChangedEvent {
   activeLearners: number;
 }
 
-export type GroupEvent = QuestionCreatedEvent | AnswerCreatedEvent | PresenceChangedEvent;
+export type GroupEvent = QuestionCreatedEvent | AnswerCreatedEvent | PresenceChangedEvent | { type: "group.changed" | "question.updated"; groupId: number; questionId?: number };
 type Subscriber = (event: GroupEvent) => void;
 
 interface GroupChannel {

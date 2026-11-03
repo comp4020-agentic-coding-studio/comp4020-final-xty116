@@ -24,6 +24,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       courseCode: formText(form, "courseCode", { min: 2, max: 30 }).toUpperCase(),
       description: formText(form, "description", { min: 12, max: 280 }),
       visibility: visibilityValue,
+      kind: form.get("kind") === "course" ? "course" : "study",
       inviteCode: randomBytes(4).toString("hex").slice(0, 6).toUpperCase(),
     });
     recordActivity(viewer, { action: "group.created", result: "succeeded", groupId });
