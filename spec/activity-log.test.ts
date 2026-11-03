@@ -26,7 +26,8 @@ async function availablePort(): Promise<number> {
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const address = server.address();
-  if (!address || typeof address === "string") throw new Error("Could not reserve a test port");
+  if (!address || typeof address === "string")
+    throw new Error("Could not reserve a test port");
   server.close();
   await once(server, "close");
   return address.port;
@@ -55,7 +56,11 @@ async function newSession(): Promise<string> {
   return cookieFrom(await fetch(appUrl, { redirect: "manual" }));
 }
 
-async function post(path: string, cookie: string, fields: Record<string, string>): Promise<Response> {
+async function post(
+  path: string,
+  cookie: string,
+  fields: Record<string, string>,
+): Promise<Response> {
   return fetch(new URL(path, appUrl), {
     method: "POST",
     redirect: "manual",
@@ -69,23 +74,23 @@ async function post(path: string, cookie: string, fields: Record<string, string>
 }
 
 function idFrom(response: Response, kind: "groups" | "questions"): number {
-  const match = response.headers.get("location")?.match(new RegExp(`/${kind}/(\\d+)`));
+  const match = response.headers
+    .get("location")
+    ?.match(new RegExp(`/${kind}/(\\d+)`));
   if (!match) throw new Error(`No ${kind} id in redirect`);
   return Number(match[1]);
 }
 
 async function activityEvents(expectedCount: number): Promise<ActivityEvent[]> {
   for (let attempt = 0; attempt < 100; attempt += 1) {
-    const events = output
-      .split("\n")
-      .flatMap((line) => {
-        try {
-          const event = JSON.parse(line) as ActivityEvent;
-          return event.event === "studynow.activity" ? [event] : [];
-        } catch {
-          return [];
-        }
-      });
+    const events = output.split("\n").flatMap((line) => {
+      try {
+        const event = JSON.parse(line) as ActivityEvent;
+        return event.event === "studynow.activity" ? [event] : [];
+      } catch {
+        return [];
+      }
+    });
     if (events.length >= expectedCount) return events;
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
@@ -117,7 +122,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   app.kill("SIGTERM");
-  await Promise.race([once(app, "exit"), new Promise((resolve) => setTimeout(resolve, 1_000))]);
+  await Promise.race([
+    once(app, "exit"),
+    new Promise((resolve) => setTimeout(resolve, 1_000)),
+  ]);
   await rm(dataDirectory, { recursive: true, force: true });
 });
 
@@ -136,7 +144,10 @@ it("tells two browser sessions apart in server activity logs without leaking the
   expect(created.status).toBe(303);
   const groupId = idFrom(created, "groups");
 
-  expect((await post("/api/groups/join", learner, { groupId: String(groupId) })).status).toBe(303);
+  expect(
+    (await post("/api/groups/join", learner, { groupId: String(groupId) }))
+      .status,
+  ).toBe(303);
 
   const questionBody = `Sensitive question body ${suffix}`;
   const asked = await post(`/api/groups/${groupId}/questions`, owner, {
@@ -158,13 +169,19 @@ it("tells two browser sessions apart in server activity logs without leaking the
   ).toBe(303);
 
   const events = await activityEvents(4);
-  const groupCreated = events.find((event) => event.action === "group.created" && event.groupId === groupId);
-  const groupJoined = events.find((event) => event.action === "group.joined" && event.groupId === groupId);
+  const groupCreated = events.find(
+    (event) => event.action === "group.created" && event.groupId === groupId,
+  );
+  const groupJoined = events.find(
+    (event) => event.action === "group.joined" && event.groupId === groupId,
+  );
   const questionCreated = events.find(
-    (event) => event.action === "question.created" && event.questionId === questionId,
+    (event) =>
+      event.action === "question.created" && event.questionId === questionId,
   );
   const answerCreated = events.find(
-    (event) => event.action === "answer.created" && event.questionId === questionId,
+    (event) =>
+      event.action === "answer.created" && event.questionId === questionId,
   );
 
   expect(groupCreated).toMatchObject({ result: "succeeded" });
@@ -193,7 +210,8 @@ it("records a server-side permission denial without storing the rejected content
     name: `Private Instrument ${suffix}`,
     institution: "Test University",
     courseCode: `LOCK${suffix}`,
-    description: "A private room used to verify that denied writes are visible in the logs.",
+    description:
+      "A private room used to verify that denied writes are visible in the logs.",
     visibility: "private",
   });
   const groupId = idFrom(created, "groups");
@@ -210,14 +228,20 @@ it("records a server-side permission denial without storing the rejected content
   const events = await activityEvents(eventsBefore + 2);
   const denied = events.find(
     (event) =>
-      event.action === "question.created" && event.result === "denied" && event.groupId === groupId,
+      event.action === "question.created" &&
+      event.result === "denied" &&
+      event.groupId === groupId,
   );
   expect(denied?.actorId).toMatch(/^[a-f0-9]{12}$/);
   expect(denied?.actorLabel).toMatch(/^Anonymous /);
 
-  const groupPage = await fetch(new URL(`/groups/${groupId}`, appUrl), { headers: { cookie: owner } });
+  const groupPage = await fetch(new URL(`/groups/${groupId}`, appUrl), {
+    headers: { cookie: owner },
+  });
   expect(groupPage.status).toBe(200);
-  expect(await groupPage.text()).not.toContain(`A stranger should not post ${suffix}`);
+  expect(await groupPage.text()).not.toContain(
+    `A stranger should not post ${suffix}`,
+  );
   expect(output).not.toContain(rejectedBody);
   expect(output).not.toContain(stranger.split("=", 2)[1]);
 });
@@ -229,13 +253,16 @@ it("accounts for identity changes, invalid invitations and rejected answers", as
   const eventsBefore = (await activityEvents(6)).length;
   const displayName = `Instrument Learner ${suffix}`;
 
-  expect((await post("/api/profile", stranger, { displayName })).status).toBe(303);
+  expect((await post("/api/profile", stranger, { displayName })).status).toBe(
+    303,
+  );
 
   const created = await post("/api/groups", owner, {
     name: `Answer Instrument ${suffix}`,
     institution: "Test University",
     courseCode: `ANS${suffix}`,
-    description: "A private room used to verify the remaining activity log outcomes.",
+    description:
+      "A private room used to verify the remaining activity log outcomes.",
     visibility: "private",
   });
   const groupId = idFrom(created, "groups");
@@ -247,21 +274,28 @@ it("accounts for identity changes, invalid invitations and rejected answers", as
   const questionId = idFrom(asked, "questions");
   const rejectedAnswer = `A non-member answer that must remain private ${suffix}`;
 
-  const answerResponse = await post(`/api/questions/${questionId}/answers`, stranger, {
-    body: rejectedAnswer,
-    anonymous: "on",
-  });
+  const answerResponse = await post(
+    `/api/questions/${questionId}/answers`,
+    stranger,
+    {
+      body: rejectedAnswer,
+      anonymous: "on",
+    },
+  );
   expect(answerResponse.status).toBe(303);
   expect(answerResponse.headers.get("location")).toContain("Join+the+group");
 
   const invalidInvite = `NO${suffix.slice(0, 4)}`.toUpperCase();
-  const joinResponse = await post("/api/groups/join", stranger, { inviteCode: invalidInvite });
+  const joinResponse = await post("/api/groups/join", stranger, {
+    inviteCode: invalidInvite,
+  });
   expect(joinResponse.status).toBe(303);
   expect(joinResponse.headers.get("location")).toContain("does+not+match");
 
   const events = await activityEvents(eventsBefore + 5);
   const profileUpdated = events.find(
-    (event) => event.action === "profile.updated" && event.result === "succeeded",
+    (event) =>
+      event.action === "profile.updated" && event.result === "succeeded",
   );
   const answerDenied = events.find(
     (event) =>
@@ -274,7 +308,10 @@ it("accounts for identity changes, invalid invitations and rejected answers", as
   );
 
   expect(profileUpdated?.actorId).toMatch(/^[a-f0-9]{12}$/);
-  expect(answerDenied).toMatchObject({ actorId: profileUpdated?.actorId, groupId });
+  expect(answerDenied).toMatchObject({
+    actorId: profileUpdated?.actorId,
+    groupId,
+  });
   expect(joinRejected).toMatchObject({ actorId: profileUpdated?.actorId });
   expect(output).not.toContain(displayName);
   expect(output).not.toContain(rejectedAnswer);
@@ -282,15 +319,37 @@ it("accounts for identity changes, invalid invitations and rejected answers", as
 });
 
 it("records denied status changes using the same operational identity as other actions", async () => {
-  const owner = await newSession(), stranger = await newSession();
+  const owner = await newSession(),
+    stranger = await newSession();
   const before = (await activityEvents(11)).length;
-  const created = await post("/api/groups", owner, { name: "Status activity contract", institution: "ANU", courseCode: "TEST1000", description: "Record who attempted to change another learner's question.", visibility: "private" });
+  const created = await post("/api/groups", owner, {
+    name: "Status activity contract",
+    institution: "ANU",
+    courseCode: "TEST1000",
+    description: "Record who attempted to change another learner's question.",
+    visibility: "private",
+  });
   const groupId = idFrom(created, "groups");
-  const asked = await post(`/api/groups/${groupId}/questions`, owner, { title: "Who can mark this question understood?", body: "Only its author or the room organiser can change the status.", anonymous: "on" });
+  const asked = await post(`/api/groups/${groupId}/questions`, owner, {
+    title: "Who can mark this question understood?",
+    body: "Only its author or the room organiser can change the status.",
+    anonymous: "on",
+  });
   const questionId = idFrom(asked, "questions");
-  const denied = await post(`/api/questions/${questionId}/resolve`, stranger, { resolved: "1" });
+  const denied = await post(`/api/questions/${questionId}/resolve`, stranger, {
+    resolved: "1",
+  });
   expect(denied.status).toBe(403);
   const events = await activityEvents(before + 3);
-  expect(events).toEqual(expect.arrayContaining([expect.objectContaining({ action: "question.resolved", result: "denied", groupId, questionId })]));
+  expect(events).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        action: "question.resolved",
+        result: "denied",
+        groupId,
+        questionId,
+      }),
+    ]),
+  );
   expect(output).not.toContain(stranger.split("=", 2)[1]);
 });

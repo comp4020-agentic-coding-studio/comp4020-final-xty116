@@ -1,138 +1,156 @@
-# Process overview
+# Building StudyNow
 
-## From an open brief to a narrow loop
+This account was assembled with Codex from the repository and the project's
+recorded directions. The agent implemented and ran the checks; the product
+direction came from the student: small study groups, teacher-led course rooms,
+anonymous questions, several explanations, visual working and retrieval of
+related discussions. [The acceptance record](docs/final-requirements.md)
+separates those ambitions from the course's fixed requirements. The record
+below distinguishes automated evidence from claims requiring human judgement.
 
-I did not begin with a feature list. I compared ideas across education,
-operations, accessibility and consumer coordination against the same question:
-does another person make the core interaction more valuable, or is “multi-user”
-only decoration? StudyNow survived because its smallest loop already needs
-other people: one learner risks a question, several peers offer genuinely
-different paths through it, and the group keeps those paths as shared memory.
+## Choosing what good means
 
-The original idea was much larger: teachers importing whole courses, public
-world groups, images, a collaborative drawing board and LLM retrieval. For Crit
-8 I reduced that to create or join a group, ask anonymously, and let two people
-answer the same persistent question. The product rules in
+The first important decision was to build a learning commons rather than a
+generic chat feed. The rules committed in
 [`59f2614`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/59f2614)
-record the boundary before implementation: private content is authorised on
-the server, anonymity is a display choice backed by a session, and popularity
-mechanics do not decide which explanation matters.
+put anonymous participation, private-course boundaries and several explanations
+ahead of popularity mechanics. The initial implementation deliberately deferred
+images and model retrieval while establishing a smaller durable loop. This was
+not abandonment of the original direction: the final phase returns to those
+requirements after the permission and persistence boundaries exist.
 
-## Harness before interface
+Edmondson's account of interpersonal risk informed anonymity and aggregate
+presence; Mazur's Peer Instruction informed keeping alternative explanations.
+Neither source establishes that this particular application improves learning.
+The README now separates enforced claims from judged ones and cites W3C form
+guidance for the accessible interaction. Its argument is that a useful peer
+explanation should remain findable without turning uncertainty into a score.
 
-I turned the checkable part of the Crit 8 claim into a running-app contract in
-[`3e23482`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/3e23482).
-The test opens two independent sessions, gives the owner a deliberately
-recognisable display name, creates a private group, proves the second session
-gets a 404, joins it through the invite code, and posts two answers. Its final
-assertion is important: the question page contains both answers after another
-request but not the owner's visible name. A separate check rejects a
-cross-origin write. This let privacy, participation and persistence apply
-backpressure before visual polish could disguise a missing rule.
+## Stack and workflow
 
-## Stack decision
+[ADR 001](docs/adr-001-stack.md) records the choice of Astro SSR, Node and SQLite
+on the supplied persistent volume. A separate client application and hosted
+database would add deployment and state boundaries to a one-machine project.
+Server-rendered forms keep asking, joining and answering usable before browser
+JavaScript starts. SQLite transactions keep membership and content together;
+the accepted cost is one instance and limited write concurrency, not a claim
+of campus-wide scale.
 
-I kept Astro's server-rendered form model from the preceding full-stack crit,
-but started the product source from nothing. I chose Astro SSR, Node and one
-SQLite file rather than a React client plus a separate database. The course
-provides one 256 MB machine and one persistent `/data` volume; SQLite fits that
-deployment shape, keeps local and production behaviour close, and can support
-the eventual real-time layer through server-sent events without requiring a
-second service. The cost is deliberate: one writer and one app instance are
-appropriate for a small learning commons, but this is not an architecture for
-campus-wide scale. [ADR 001](docs/adr-001-stack.md) records the alternatives and
-the point at which I should reconsider the choice.
-
-The implementation in
+The workflow used small commits, public HTTP contracts and browser inspection.
+The contract in
+[`3e23482`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/3e23482)
+creates two independent sessions, refuses a private read, joins through an
+invitation and checks that both explanations survive another request. It also
+gives the owner a recognisable display name and proves anonymous presentation
+does not expose it. The implementation in
 [`de07056`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/de07056)
-makes SQLite the source of truth for sessions, memberships, groups, questions
-and answers. Public membership and invite membership share one path after
-joining; private reads and every contribution are checked again on the server.
-The browser never decides whether someone belongs.
+puts the permission decision on the server, rather than treating hidden controls
+as access control.
 
-## Correction and judgement
+## Corrections that changed the harness
 
-The first typecheck caught imports that climbed one directory too far from the
-nested API routes. I corrected the path rather than weakening TypeScript's
-coverage. The running contract then passed with two sessions. Visual checks at
-exactly 1920×1080 and 390×844 found no horizontal overflow, but the mobile
-header compressed its last navigation item and the image caption advertised
-future sketch support. I tightened the mobile navigation and removed that
-promise: a Crit 8 interface should show what works now, not disabled evidence
-of ambition.
+The first deployment exposed Fly's HTTPS termination: the app received HTTP
+behind a public HTTPS origin. The correction kept the origin check, trusted
+only the exact course domain and added a regression contract for that proxy
+shape. A local green check alone had not established deployability.
 
-The public deployment exposed a boundary unavailable locally: Fly terminates
-HTTPS before forwarding plain HTTP to Astro. The original
-same-origin check therefore rejected legitimate forms. I configured Astro to
-trust only the exact Fly HTTPS domain, kept the application-level origin check,
-added a full-stack regression test for that proxy shape, and repeated the
-two-session flow against the live app.
-
-## Real time without a second truth
-
-For Crit 9 I defined the public seam before choosing a transport. In
-[`d692900`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/d692900),
-one authenticated browser holds a stream open while another creates a question;
-the event must carry the resulting question ID in under one second. The first
-run failed at a useful place, a missing endpoint returning 404. Server-sent
-events were the smallest answer because StudyNow's writes already had reliable
-form endpoints and the missing direction was only server-to-browser. WebSockets
-would duplicate the write path and fast polling would make the one-second claim
-by continuously asking the database whether anything happened.
-
-The next contract in
-[`cdc5b3d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/cdc5b3d)
-made answers live through the same channel and proved a non-member receives 404
-from a private group's stream. The question and answer implementation commits
+For real time, the red contract in
+[`d692900`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/d692900)
+required another session to receive a question in under one second. SSE fitted
+the existing form writes better than a second bidirectional protocol. The
+question and answer commits
 [`e9805b2`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/e9805b2)
 and
 [`091b5d4`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/091b5d4)
-keep SQLite ahead of the broadcast: an event exists only after its durable write
-succeeds. An interrupted stream can therefore forget events safely; reconnecting
-clients fetch the current regions from the database.
+broadcast only after durable writes. Reconnection can rebuild from SQLite
+instead of needing every missed event.
 
-The harder product choice was presence. I considered a named roster, no signal,
-and an anonymous count. The README's definition of good ruled out the roster:
-showing exactly who is watching would put the spotlight back onto a learner's
-uncertainty. The failing presence contract in
+Presence required a product judgement. [ADR 002](docs/adr-002-realtime-presence.md)
+chooses an anonymous count over a named roster. Its test in
 [`9f8a850`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/9f8a850)
-therefore asks only for `activeLearners: 2` and explicitly rejects both display
-names. [ADR 002](docs/adr-002-realtime-presence.md) records the choice and its
-cost. My first green run still failed because the test demanded exact object
-equality and rejected the harmless event `type`; changing it to assert only the
-published fields corrected the harness rather than distorting the event format.
-
-The browser layer in
+rejects the deliberately recognisable display names. The browser work in
 [`345054f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/345054f)
-replaces only question, answer and count regions. I verified it with an open
-browser plus a second cookie session: a question and an answer appeared without
-the URL changing or a reload. At 1920×1080 and 390×844 there was no horizontal
-overflow. Stopping the server changed the visible state to `Reconnecting`;
-starting it against the same SQLite file returned it to `Live` and restored the
-new content. That manual interruption checked the part a green delivery timer
-could not: what the learner sees when the happy path ends.
+replaces discussion regions while preserving the composer. That distinction
+matters when one learner is still writing while another posts.
 
-## Flying by instruments
+## Operational identity
 
-Crit 10 made process output a product boundary. The contract in
+Crit 10 treated stdout as an interface. The contract in
 [`9685afe`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/9685afe)
-starts the built server, drives two cookie sessions through its HTTP forms and
-reads stdout exactly as `flyctl logs` does. It first failed because successful
-writes produced no activity events. The implementation in
+starts the production build and follows two sessions through shared state.
 [`897a067`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/897a067)
-emits one JSON line with action, result and resource IDs.
-
-Logging a full session ID would expose its credential, while a display name
-would contradict anonymous participation. [ADR 003](docs/adr-003-operational-identity.md)
-therefore chooses a short hash of the high-entropy session ID plus the stable
-anonymous label. Red contracts
-[`9cd3823`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/9cd3823)
-and
-[`a627fc1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/a627fc1)
-then forced denied and invalid actions into view. The corrections in
-[`52be28e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/52be28e)
-and
+adds structured activity events. Later tests exposed the success-only blind
+spot; the correction in
 [`ad54a38`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/ad54a38)
-fixed my success-only first cut without storing rejected drafts. The final
-check is operational: two fresh sessions act on shared state while a log tail,
-not my own UI, identifies each actor and outcome.
+includes rejected joins and denied answers. [ADR 003](docs/adr-003-operational-identity.md)
+explains why logs use a session hash instead of its credential or a display
+name. The earlier crit tags remain unchanged as historical evidence.
+
+## Completing visual peer learning
+
+The final-phase direction specifically rejected stopping at text-only rooms.
+[`3fb2b9a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/3fb2b9a)
+stores images and handwritten PNGs transactionally with their contributions.
+An HTTP contract retrieves each image as its owner and receives 404 as a
+stranger. [ADR 004](docs/adr-004-visual-retrieval.md) weighs database BLOBs against
+ephemeral files and another storage service. Upload bounds and descriptions
+became explicit rules rather than relying on the file picker.
+
+The invitation contract first failed with a missing endpoint.
+[`23dc90a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/23dc90a)
+adds organiser-only class lists, one-use acceptance and roster privacy. It
+deliberately does not claim verified university enrolment or automatic email.
+[`6ea764e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/6ea764e)
+integrates a common composer with image previews, drawing, undo, redo and draft
+recovery. Signature Pad supplies the stroke engine; Lucide supplies consistent
+icons. Browser inspection included drawing and publishing an actual sketch at
+the phone marking viewport, not just checking that a canvas existed.
+
+The interface revision also corrected the first-visit hierarchy. A large empty
+"your rooms" panel initially pushed the useful public room below the first
+screen. New visitors now see a joinable room immediately; the photographic
+banner has a stable height instead of sizing itself from its image. Labels and
+secondary copy were darkened and enlarged after inspecting the phone view.
+These changes protect the act of finding a study space, not just a preferred
+colour palette. Dialogs retain ordinary destination links for the no-script
+path, while native dialog behaviour supplies focus containment and Escape.
+
+## Retrieval and acceptance
+
+[`5266365`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/5266365)
+implements model-assisted retrieval of existing discussions. Authorised
+candidates are selected before the request; suggested IDs are checked again
+after it. Its upstream-contract test deliberately proposes an inaccessible ID
+and a fabricated one, then simulates provider failure. The expected results
+are linked authorised questions or explicitly labelled keyword fallback.
+This tests the boundary, not live provider availability. Deployment credentials
+and connectivity require a separate operational check.
+
+The same production-process test stops and restarts the app against its retained
+database, then verifies both persisted content and private access. Structural
+axe checks complement browser inspection, rather than substituting for visual
+readability or educational judgement. The final acceptance record links the
+course requirements to the deployed state, CI and remaining operational limits;
+it does not treat a green suite as a promised grade.
+
+Independent standards and specification reviews found a subtler concurrency
+failure: a new search could finish before an older refresh, leaving a peer
+update queued forever. The regression in
+[`434e6ef`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/434e6ef)
+reproduces that ordering through form events and delayed HTTP responses; it
+fails with only two requests where a third is required. The correction in
+[`495a9a9`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/495a9a9)
+drains the queue after releasing the refresh lock. It also checks that unfinished
+query text is preserved and never sent by a background update.
+
+## Visual evidence
+
+The workspace and phone question illustrate the interface in
+[`6ea764e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/6ea764e),
+with the review corrections above. [Recovered sketch](docs/evidence/draft-recovery-phone.jpg)
+and [live search](docs/evidence/search-live-desktop.jpg) capture the corresponding
+manual checks. [Verification notes](docs/verification.md) distinguish local,
+browser and live-service evidence.
+
+![Workspace at the desktop marking viewport](docs/evidence/workspace-desktop.jpg)
+![Posted handwritten question at the phone marking viewport](docs/evidence/question-phone.jpg)

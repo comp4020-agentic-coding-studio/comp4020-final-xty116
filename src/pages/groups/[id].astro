@@ -81,7 +81,11 @@ const questions = allQuestions.filter(
           {group.isOwner && (
             <span class="owner-label">You organise this room</span>
           )}
-          {group.isMember && <a class="primary-button small ask-shortcut" href="#ask"><i data-lucide="pen-line" aria-hidden="true"></i>Ask a question</a>}
+          {group.isMember && (
+            <a class="primary-button small ask-shortcut" href="#ask">
+              <i data-lucide="pen-line" aria-hidden="true"></i>Ask a question
+            </a>
+          )}
         </div>
       </section>
       <RealtimePresence groupId={group.id} mode="group" />

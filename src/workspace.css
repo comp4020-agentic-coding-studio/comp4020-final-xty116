@@ -174,7 +174,11 @@ input[type="range"] {
 .skip-link:focus {
   transform: none;
 }
-#ask, #answer, #answers { scroll-margin-top: 104px; }
+#ask,
+#answer,
+#answers {
+  scroll-margin-top: 104px;
+}
 .app-sidebar {
   width: var(--sidebar);
   height: 100dvh;

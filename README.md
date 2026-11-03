@@ -1,73 +1,78 @@
 # StudyNow
 
-## The argument
+## Start here
 
-StudyNow is a live learning commons where a member can ask under a stable
-pseudonym, peers offer several explanations, and the group retains them. It
-serves the moment a learner will admit confusion without performing it before
-a class or social feed.
+[Open StudyNow](https://comp4020-final-xty116.fly.dev/). No account, installation,
+API key or payment is required. Use two separate Chrome profiles;
+an incognito window also works. Each browser receives its own durable identity.
+Keep that profile's cookies when returning tomorrow.
 
-Good means a small group can make uncertainty visible without exposing someone,
-then retain its help as trusted memory. It does not mean the largest platform
-or fastest automatic answer.
+1. In profile A, select **Create room**, enter a school and course, and keep
+   **Invite only** selected. The creator becomes its organiser.
+2. Copy the room invitation link into profile B and join. Alternatively, enter
+   the six-character code through **Join**. Keep both profiles on this room.
+3. A posts an anonymous question. Add text, an image, or a sketch; describe any
+   visual. B sees it appear automatically. Both can open the same question and
+   independently share explanations, including pictures and handwriting.
+4. Keep A's question page open while B answers. The explanation appears without
+   reloading, and A's unfinished draft stays intact. Presence counts people
+   without displaying a roster. The author can mark the question understood.
+5. Return through the same room or question URL tomorrow. Search its wording
+   through **Find understanding** to rediscover it. Keyword search is always
+   available; AI mode labels model matches and any service-unavailable fallback.
+
+For a class, create up to 150 individual invitations, copy links or download a
+CSV, and see acceptance counts. **Explore** is
+the worldwide directory of public rooms. The example room labels its starter discussions.
 
 ## What good means here
 
-**Safe enough to ask.** Amy Edmondson connects psychological safety with
-learning behaviour: people need room to take interpersonal risks before a team
-can learn from what they do not know. StudyNow therefore separates identity
-from presentation. A contribution always belongs to a server-side session, but
-peers see a stable anonymous name when its author chooses anonymity. Anonymous
-does not mean unaccountable, and it must never mean invisible to moderation.
+StudyNow is for the moment a learner can admit confusion to peers but would
+hesitate before a whole class. Good means uncertainty can become shared
+understanding without becoming a performance metric.
 
-**More than one path through a problem.** Eric Mazur's work on Peer Instruction
-treats explanation between learners as part of learning, not merely a cheaper
-substitute for the teacher. StudyNow keeps multiple answers side by side. It
-does not crown one response through likes, streaks or follower counts. A
-concrete example, a correction and a formal derivation can all be useful to
-different people.
+Edmondson's discussion of interpersonal risk in team learning [1] informs
+anonymous posting and aggregate presence. Pseudonyms create continuity without
+a named audience watching someone's uncertainty. This is a design hypothesis,
+not evidence that anonymity alone produces psychological safety.
 
-**A memory with boundaries.** Public groups can become shared references;
-invite-only courses cannot become public search material by accident. Every
-read and write is authorised on the server. By the final version, semantic
-search may summarise only material the current user can already open, and every
-summary must link back to its questions and answers. “No relevant answer” is a
-better result than an invented one.
+Mazur's Peer Instruction [2] gives the second commitment: explaining an idea
+to another learner is part of learning. Several explanations remain available;
+there is no winning answer, popularity ranking or automatic homework solution.
+A photo of working or a handwritten diagram can express reasoning that a
+text-only forum would make cumbersome.
 
-**Quietly usable.** Asking and answering must work without client-side
-JavaScript, at the desktop and phone marking viewports, with a keyboard and
-clear form labels. The W3C's guidance that visible, associated labels make
-forms more predictable informed the deliberately plain contribution forms.
+The third commitment is reusable memory with boundaries. Public discussions
+are discoverable; private course work stays inside its membership. AI finds
+related existing discussions and links to them. It does not invent classmates
+or silently promote a generated explanation into the conversation.
 
-## What the current build protects
+## Enforced and judged
 
-StudyNow persists groups, invitation membership, anonymous questions and
-independent answers in SQLite on Fly's volume. Contract tests prove private
-groups stay private, membership changes access, anonymous posts hide a chosen
-display name, and two people's work survives a reload.
+The HTTP checks in `spec/` enforce separate identities, membership permissions,
+anonymous presentation, concurrent explanations, attachment privacy, model
+source filtering, real-time delivery and persistence across a process restart.
+Writes commit before broadcast. Questions, answers, membership and image bytes
+live on Fly's persistent volume. Reconnection rebuilds the displayed discussion;
+drafts remain local. Operational logs exclude credentials and contribution text.
 
-The real-time layer broadcasts only work that has already been committed to
-SQLite. Open group pages receive new questions and answer counts; open question
-pages receive new explanations within a second without reloading. Aggregate
-presence shows that peers are here without naming them. Drafts stay local;
-reconnection restores visible regions from durable storage.
+Visible labels, keyboard focus and feedback follow W3C guidance [3]. Automated
+accessibility checks support manual judgement at 1920×1080 and
+390×844. Readability, useful explanations and a welcoming tone still require
+people's judgement; passing tests does not establish educational effectiveness.
 
-Every core write emits a structured `studynow.activity` line after server-side
-checks. It correlates a pseudonymous actor with resource IDs and an outcome,
-never cookies, invite codes, names or contribution text. Production activity is
-live through `mise exec -- flyctl logs -a comp4020-final-xty116`.
+## Deliberate boundaries
 
-## What I chose not to build
-
-This is not an LMS, a general chat server or an AI homework generator. There is
-no university login integration, gradebook, follower graph, popularity ranking
-or infinite feed. Image answers, a drawing surface and permission-aware
-semantic retrieval remain later project decisions. Shipping their disabled
-controls now would make the interface look further along while making the core
-less believable.
+This is a learning commons, not a university enrolment system. An invitation
+grants access by possession; school affiliation is not verified, and invitations
+are distributed by the organiser rather than emailed automatically. Private
+content is accessible to members and, on their deliberate AI request, its text
+excerpts reach the configured model; names, images and drafts do not. Model
+retrieval is bounded and rate-limited, with honest keyword fallback. There is
+no gradebook, advertising or engagement score.
 
 ## Sources
 
-- Amy Edmondson, [“Psychological Safety and Learning Behavior in Work Teams”](https://doi.org/10.2307/2666999), 1999.
-- Eric Mazur Group, [“Peer Instruction: Getting Students to Think in Class”](https://mazur.harvard.edu/presentations/peer-instruction-getting-students-think-class-0).
-- W3C Web Accessibility Initiative, [“Labeling Controls”](https://www.w3.org/WAI/tutorials/forms/labels/).
+1. Amy C. Edmondson, [Managing the risk of learning](https://www.hbs.edu/ris/download.aspx?name=02-062.pdf), 2002.
+2. Mazur Group, [Peer Instruction: Getting Students to Think in Class](https://mazur.harvard.edu/presentations/peer-instruction-getting-students-think-class-0), 1999.
+3. W3C WAI, [Labeling Controls](https://www.w3.org/WAI/tutorials/forms/labels/).

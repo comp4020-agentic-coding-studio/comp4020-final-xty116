@@ -103,7 +103,10 @@ async function refresh(): Promise<void> {
     }, 1500);
   } finally {
     refreshing = false;
-    if (refreshQueued && !pending) queueMicrotask(() => { void refresh(); });
+    if (refreshQueued && !pending)
+      queueMicrotask(() => {
+        void refresh();
+      });
   }
 }
 document.addEventListener("studynow:commons", () => {
