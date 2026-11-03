@@ -1,21 +1,28 @@
 ---
 interface Props {
   groupId: number;
-  mode: "group" | "question";
+  mode: "group" | "question" | "commons";
   questionId?: number;
 }
 
 const { groupId, mode, questionId } = Astro.props;
 const regions =
-  mode === "group"
-    ? "[data-group-question-count]|[data-question-total]|[data-question-feed-content]"
-    : "[data-question-answer-total]|[data-answer-shared-total]|[data-answers-title]|[data-answer-list]";
+  mode === "commons"
+    ? "[data-room-grid]|[data-room-total]|[data-public-room-grid]|[data-open-threads]"
+    : mode === "group"
+      ? "[data-group-stats]|[data-question-total]|[data-question-feed-content]|[data-invite-state]"
+      : "[data-question-summary]|[data-answer-shared-total]|[data-answers-title]|[data-answer-list]";
 ---
 
 <section
-  class:list={["realtime-panel", { compact: mode === "question" }]}
+  class:list={[
+    "realtime-panel",
+    { compact: mode === "question", "commons-realtime": mode === "commons" },
+  ]}
   data-realtime
-  data-stream-url={`/api/groups/${groupId}/events`}
+  data-stream-url={
+    mode === "commons" ? "/api/events" : `/api/groups/${groupId}/events`
+  }
   data-realtime-mode={mode}
   data-question-id={questionId}
   data-live-regions={regions}
@@ -23,11 +30,24 @@ const regions =
 >
   <div class="live-connection">
     <span class="live-dot" data-live-dot aria-hidden="true"></span>
-    <span><strong data-live-label>Connecting</strong><small>Updates arrive without reloading</small></span>
+    <span>
+      <strong data-live-label>Connecting</strong>
+      <small>Updates arrive without reloading</small>
+    </span>
   </div>
-  <p class="live-presence"><strong data-presence-count>—</strong> <span data-presence-word>learners</span> here now</p>
-  <p class="live-privacy">Presence is counted, never named. Drafts stay on this device.</p>
-  <span class="sr-only" role="status" aria-live="polite" data-live-announcer></span>
+  <p class="live-presence">
+    <strong data-presence-count>—</strong>{" "}
+    <span data-presence-word>learners</span> here now
+  </p>
+  <p class="live-privacy">
+    Presence is counted, never named. Drafts stay on this device.
+  </p>
+  <span
+    class="sr-only"
+    role="status"
+    aria-live="polite"
+    data-live-announcer
+  ></span>
 </section>
 
 <script>
@@ -45,12 +65,14 @@ const regions =
     const label = root.querySelector<HTMLElement>("[data-live-label]");
     const dot = root.querySelector<HTMLElement>("[data-live-dot]");
     const count = root.querySelector<HTMLElement>("[data-presence-count]");
-    const presenceWord = root.querySelector<HTMLElement>("[data-presence-word]");
+    const presenceWord = root.querySelector<HTMLElement>(
+      "[data-presence-word]",
+    );
     const announcer = root.querySelector<HTMLElement>("[data-live-announcer]");
-    if (!streamUrl || !label || !dot || !count || !presenceWord || !announcer) return;
+    if (!streamUrl || !label || !dot || !count || !presenceWord || !announcer)
+      return;
 
     const source = new EventSource(streamUrl);
-    let readyCount = 0;
     let syncing = false;
     let syncRequested = false;
 
@@ -72,12 +94,17 @@ const regions =
         headers: { "x-studynow-sync": "partial" },
       });
       if (!response.ok) throw new Error(`Sync failed with ${response.status}`);
-      const nextDocument = new DOMParser().parseFromString(await response.text(), "text/html");
+      const nextDocument = new DOMParser().parseFromString(
+        await response.text(),
+        "text/html",
+      );
       for (const selector of selectors) {
         const current = document.querySelector(selector);
         const next = nextDocument.querySelector(selector);
         if (current && next) current.replaceWith(next);
       }
+      document.dispatchEvent(new Event("studynow:updated"));
+      if (source.readyState === EventSource.OPEN) setConnection("live");
     };
 
     const syncRegions = async () => {
@@ -90,19 +117,25 @@ const regions =
           await refreshOnce();
         }
       } catch {
-        announce("Live update was delayed. Reconnecting will restore the latest discussion.");
+        setConnection("reconnecting");
+        announce(
+          "Live update was delayed. Reconnecting will restore the latest discussion.",
+        );
+        window.setTimeout(() => {
+          if (source.readyState !== EventSource.CLOSED) void syncRegions();
+        }, 1500);
       } finally {
         syncing = false;
       }
     };
 
-    const payload = (event: Event): LivePayload => JSON.parse((event as MessageEvent<string>).data) as LivePayload;
+    const payload = (event: Event): LivePayload =>
+      JSON.parse((event as MessageEvent<string>).data) as LivePayload;
 
     source.addEventListener("open", () => setConnection("live"));
     source.addEventListener("error", () => setConnection("reconnecting"));
     source.addEventListener("ready", () => {
-      readyCount += 1;
-      if (readyCount > 1) void syncRegions();
+      void syncRegions();
     });
     source.addEventListener("presence.changed", (event) => {
       const activeLearners = payload(event).activeLearners ?? 0;
@@ -120,6 +153,16 @@ const regions =
         void syncRegions();
         announce("A new explanation arrived.");
       }
+    });
+    source.addEventListener("group.changed", () => {
+      void syncRegions();
+    });
+    source.addEventListener("question.updated", () => {
+      void syncRegions();
+      announce("Question status updated.");
+    });
+    source.addEventListener("commons.changed", () => {
+      void syncRegions();
     });
 
     window.addEventListener("pagehide", () => source.close(), { once: true });

@@ -1,0 +1,15 @@
+---
+import Layout from "../layouts/Layout.astro";
+import SetupForm from "../components/SetupForm.astro";
+import { getOrCreateViewer } from "../lib/session";
+export const prerender = false;
+const viewer = getOrCreateViewer(Astro.cookies);
+---
+
+<Layout title="Your identity | StudyNow" {viewer}>
+  <section class="standalone-form">
+    <p class="eyebrow">A little familiarity, a little privacy</p>
+    <h1>Your identity</h1>
+    <SetupForm mode="profile" {viewer} />
+  </section>
+</Layout>

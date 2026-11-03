@@ -2,131 +2,281 @@
 import Layout from "../../layouts/Layout.astro";
 import RealtimePresence from "../../components/RealtimePresence.astro";
 import CourseInvites from "../../components/CourseInvites.astro";
+import Composer from "../../components/Composer.astro";
 import { getGroup, listQuestions } from "../../lib/db";
 import { excerpt, formatTimestamp } from "../../lib/format";
 import { getOrCreateViewer } from "../../lib/session";
-
 export const prerender = false;
-
 const viewer = getOrCreateViewer(Astro.cookies);
 const groupId = Number(Astro.params.id);
-const group = Number.isInteger(groupId) ? getGroup(groupId, viewer.id) : undefined;
+const group = Number.isInteger(groupId)
+  ? getGroup(groupId, viewer.id)
+  : undefined;
 if (!group) Astro.response.status = 404;
-const questions = group ? listQuestions(group.id) : [];
-const notice = Astro.url.searchParams.get("notice");
-const error = Astro.url.searchParams.get("error");
+const filter = Astro.url.searchParams.get("filter") ?? "all";
+const query = (Astro.url.searchParams.get("q") ?? "")
+  .slice(0, 100)
+  .toLowerCase();
+const allQuestions = group ? listQuestions(group.id) : [];
+const questions = allQuestions.filter(
+  (q) =>
+    (filter !== "unanswered" || q.answerCount === 0) &&
+    (filter !== "resolved" || q.resolved) &&
+    `${q.title} ${q.body}`.toLowerCase().includes(query),
+);
 ---
 
-<Layout title={group ? `${group.name} | StudyNow` : "Group not found | StudyNow"} {viewer} {notice} {error}>
+<Layout
+  title={group ? `${group.name} | StudyNow` : "Room unavailable | StudyNow"}
+  {viewer}
+>
   {group ? (
-    <>
+    <div class="workspace-shell group-page">
+      <a class="back-link" href="/">
+        <i data-lucide="arrow-left" aria-hidden="true"></i>All your rooms
+      </a>
       <section class="group-masthead">
-        <div class="masthead-inner">
-          <a class="back-link" href="/">← All study groups</a>
-          <div class="group-title-row">
-            <div>
-              <p class="eyebrow">{group.institution} · {group.courseCode}</p>
-              <h1>{group.name}</h1>
-              <p>{group.description}</p>
-            </div>
-            <dl class="group-stats">
-              <div><dt>Learners</dt><dd>{group.memberCount}</dd></div>
-              <div><dt>Questions</dt><dd data-group-question-count>{group.questionCount}</dd></div>
-              <div><dt>Access</dt><dd>{group.visibility === "public" ? "Public" : "Invite"}</dd></div>
-            </dl>
+        <div class="group-heading">
+          <span class="room-monogram large accent-0">
+            {group.courseCode.slice(0, 2)}
+          </span>
+          <div>
+            <p class="eyebrow">
+              {group.institution} · {group.courseCode}
+              <span class="visibility-badge">
+                <i
+                  data-lucide={
+                    group.visibility === "public" ? "globe-2" : "lock-keyhole"
+                  }
+                  aria-hidden="true"
+                ></i>
+                {group.visibility === "public" ? "Public room" : "Invite only"}
+              </span>
+            </p>
+            <h1>{group.name}</h1>
+            <p>{group.description}</p>
           </div>
-          <RealtimePresence groupId={group.id} mode="group" />
+        </div>
+        <div class="group-meta-strip" data-group-stats>
+          <span>
+            <i data-lucide="users" aria-hidden="true"></i>
+            <strong>{group.memberCount}</strong> learners
+          </span>
+          <span>
+            <i data-lucide="message-circle" aria-hidden="true"></i>
+            <strong data-group-question-count>
+              {group.questionCount}
+            </strong>{" "}
+            questions
+          </span>
+          <span>
+            <i
+              data-lucide={
+                group.kind === "course" ? "graduation-cap" : "book-open"
+              }
+              aria-hidden="true"
+            ></i>
+            {group.kind === "course" ? "Course room" : "Study group"}
+          </span>
+          {group.isOwner && (
+            <span class="owner-label">You organise this room</span>
+          )}
         </div>
       </section>
-
+      <RealtimePresence groupId={group.id} mode="group" />
       <div class="group-workspace">
         <section class="question-feed" aria-labelledby="question-feed-title">
           <header class="section-heading">
             <div>
-              <p class="eyebrow">Shared questions</p>
-              <h2 id="question-feed-title">What this group is working through</h2>
+              <p class="eyebrow">ONE QUESTION. MANY WAYS THROUGH.</p>
+              <h2 id="question-feed-title">The discussion</h2>
             </div>
-            <span data-question-total>{questions.length} total</span>
+            <span class="count-pill" data-question-total>
+              {questions.length} total
+            </span>
           </header>
-
+          <div class="room-controls">
+            <nav class="view-tabs" aria-label="Question filter">
+              <a
+                href={`/groups/${group.id}`}
+                class:list={{ active: filter === "all" }}
+              >
+                All questions
+              </a>
+              <a
+                href={`/groups/${group.id}?filter=unanswered`}
+                class:list={{ active: filter === "unanswered" }}
+              >
+                Unanswered
+              </a>
+              <a
+                href={`/groups/${group.id}?filter=resolved`}
+                class:list={{ active: filter === "resolved" }}
+              >
+                Understood
+              </a>
+            </nav>
+            <a
+              class="icon-button"
+              href={`/search?groupId=${group.id}`}
+              aria-label="Search this room"
+              data-tooltip="Search room"
+            >
+              <i data-lucide="search" aria-hidden="true"></i>
+            </a>
+          </div>
           <div data-question-feed-content>
-            {questions.length > 0 ? (
+            {questions.length ? (
               <div class="question-list">
-                {questions.map((question, index) => (
+                {questions.map((question) => (
                   <article class="question-row">
-                    <span class="question-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-                    <div class="question-content">
-                      <p class="question-meta">{question.authorName} · {formatTimestamp(question.createdAt)}</p>
-                      <h3><a href={`/questions/${question.id}`}>{question.title}</a></h3>
-                      <p>{excerpt(question.body)}</p>
+                    <div
+                      class:list={[
+                        "question-symbol",
+                        { resolved: question.resolved },
+                      ]}
+                    >
+                      <i
+                        data-lucide={
+                          question.resolved ? "check-check" : "message-circle"
+                        }
+                        aria-hidden="true"
+                      ></i>
                     </div>
-                    <a class="answer-count" href={`/questions/${question.id}#answers`}>
+                    <div class="question-content">
+                      <p class="question-meta">
+                        {question.authorName}
+                        <span>·</span>
+                        {formatTimestamp(question.createdAt)}
+                        {question.attachments.length > 0 && (
+                          <span class="media-indicator">
+                            <i data-lucide="image" aria-hidden="true"></i>
+                            {question.attachments.length}
+                          </span>
+                        )}
+                      </p>
+                      <h3>
+                        <a href={`/questions/${question.id}`}>
+                          {question.title}
+                        </a>
+                      </h3>
+                      <p>
+                        {question.body
+                          ? excerpt(question.body, 155)
+                          : question.attachments[0]?.alt}
+                      </p>
+                      <span
+                        class:list={[
+                          "question-state",
+                          { resolved: question.resolved },
+                        ]}
+                      >
+                        {question.resolved
+                          ? "Understood"
+                          : question.answerCount
+                            ? "Discussing"
+                            : "Open for a first explanation"}
+                      </span>
+                    </div>
+                    <a
+                      class="answer-count"
+                      href={`/questions/${question.id}#answers`}
+                    >
                       <strong>{question.answerCount}</strong>
-                      <span>{question.answerCount === 1 ? "explanation" : "explanations"}</span>
+                      <span>
+                        {question.answerCount === 1
+                          ? "explanation"
+                          : "explanations"}
+                      </span>
                     </a>
                   </article>
                 ))}
               </div>
             ) : (
               <div class="empty-state">
-                <strong>No questions yet</strong>
-                <p>Open the first question when something deserves more than one explanation.</p>
+                <span class="empty-icon">
+                  <i data-lucide="message-circle" aria-hidden="true"></i>
+                </span>
+                <h3>
+                  {filter === "unanswered"
+                    ? "Every question has company."
+                    : filter === "resolved"
+                      ? "Understanding takes a little time."
+                      : "Every good discussion starts somewhere."}
+                </h3>
+                <p>
+                  {filter === "all"
+                    ? "Bring a question, a screenshot, or a sketch of where you got stuck."
+                    : "Try another filter, or share a question of your own."}
+                </p>
+                <a class="text-action" href="#ask">
+                  Open a question
+                  <i data-lucide="arrow-right" aria-hidden="true"></i>
+                </a>
               </div>
             )}
           </div>
         </section>
-
         <aside class="question-sidebar">
-          <CourseInvites {group} viewerId={viewer.id} />
-          {group.isOwner && (
-            <section class="invite-panel">
-              <p class="eyebrow">Invite learners</p>
-              <h2>Course code</h2>
-              <code data-invite-code>{group.inviteCode}</code>
-              <p>Share this code with the people who belong in this group.</p>
-            </section>
-          )}
-
           {group.isMember ? (
             <section class="ask-panel" id="ask">
-              <p class="eyebrow">Open a question</p>
-              <h2>What are you trying to understand?</h2>
-              <form class="stack-form" method="post" action={`/api/groups/${group.id}/questions`}>
-                <label>
-                  <span>Question</span>
-                  <input name="title" minlength="6" maxlength="140" placeholder="Why does this step work?" required />
-                </label>
-                <label>
-                  <span>Context</span>
-                  <textarea name="body" minlength="12" maxlength="1600" rows="6" placeholder="Share what you already understand and where the reasoning stops making sense." required></textarea>
-                </label>
-                <label class="check-control">
-                  <input type="checkbox" name="anonymous" checked />
-                  <span><strong>Ask anonymously</strong><small>Shown as {viewer.anonLabel}</small></span>
-                </label>
-                <button class="primary-button" type="submit">Open question</button>
-              </form>
+              <div class="panel-heading">
+                <span class="icon-tile">
+                  <i data-lucide="pen-line" aria-hidden="true"></i>
+                </span>
+                <div>
+                  <p class="eyebrow">A LITTLE CURIOSITY GOES A LONG WAY</p>
+                  <h2>Open a question</h2>
+                </div>
+              </div>
+              <Composer
+                action={`/api/groups/${group.id}/questions`}
+                mode="question"
+                anonLabel={viewer.anonLabel}
+              />
             </section>
           ) : (
             <section class="join-panel">
-              <p class="eyebrow">Public group</p>
-              <h2>Join before contributing</h2>
-              <p>You can read the discussion first. Joining lets you ask and offer explanations.</p>
+              <span class="icon-tile">
+                <i data-lucide="door-open" aria-hidden="true"></i>
+              </span>
+              <h2>There is a seat for you.</h2>
+              <p>
+                Read the discussion, then join to ask and share your own way
+                through.
+              </p>
               <form method="post" action="/api/groups/join">
                 <input type="hidden" name="groupId" value={group.id} />
-                <button class="primary-button" type="submit">Join this group</button>
+                <button class="primary-button" type="submit">
+                  Join this room<i data-lucide="plus" aria-hidden="true"></i>
+                </button>
               </form>
             </section>
           )}
+          <CourseInvites {group} viewerId={viewer.id} />
+          <section class="room-principle">
+            <i data-lucide="lightbulb" aria-hidden="true"></i>
+            <h3>A different explanation can change everything.</h3>
+            <p>
+              Show a step. Draw an example. Ask why. There is more than one
+              useful way to understand an idea.
+            </p>
+          </section>
         </aside>
       </div>
-    </>
+    </div>
   ) : (
     <section class="not-found">
-      <p class="error-code">404</p>
-      <h1>This group is not available</h1>
-      <p>It may be invite-only, or the link may no longer be valid.</p>
-      <a class="primary-button" href="/">Return to study groups</a>
+      <span class="empty-icon">
+        <i data-lucide="lock-keyhole" aria-hidden="true"></i>
+      </span>
+      <p class="eyebrow">404 · ROOM UNAVAILABLE</p>
+      <h1>This room is not available.</h1>
+      <p>It may be invite-only. Ask the organiser for an invite link.</p>
+      <a class="primary-button" href="/">
+        Back to your workspace
+        <i data-lucide="arrow-right" aria-hidden="true"></i>
+      </a>
     </section>
   )}
 </Layout>

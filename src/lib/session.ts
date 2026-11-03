@@ -3,12 +3,30 @@ import type { AstroCookies } from "astro";
 import { createViewer, getViewer, type Viewer } from "./db";
 
 const COOKIE_NAME = "studynow_session";
-const adjectives = ["Amber", "Bright", "Calm", "Curious", "Indigo", "Quiet", "Silver", "Warm"];
-const nouns = ["Atlas", "Cedar", "Comet", "Fern", "Harbour", "Juniper", "Lantern", "Willow"];
+const adjectives = [
+  "Amber",
+  "Bright",
+  "Calm",
+  "Curious",
+  "Indigo",
+  "Quiet",
+  "Silver",
+  "Warm",
+];
+const nouns = [
+  "Atlas",
+  "Cedar",
+  "Comet",
+  "Fern",
+  "Harbour",
+  "Juniper",
+  "Lantern",
+  "Willow",
+];
 
 function anonymousLabel(): string {
   const bytes = randomBytes(2);
-  return `Anonymous ${adjectives[bytes[0] % adjectives.length]} ${nouns[bytes[1] % nouns.length]}`;
+  return `Anonymous ${adjectives[bytes[0] % adjectives.length]} ${nouns[bytes[1] % nouns.length]} ${randomBytes(2).toString("hex").toUpperCase()}`;
 }
 
 export function getOrCreateViewer(cookies: AstroCookies): Viewer {

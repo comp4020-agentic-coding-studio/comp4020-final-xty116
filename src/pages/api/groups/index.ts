@@ -4,6 +4,7 @@ import { recordActivity } from "../../../lib/activity";
 import { createGroup } from "../../../lib/db";
 import { assertSameOrigin, errorResponse, formText, seeOther, ValidationError } from "../../../lib/http";
 import { getOrCreateViewer } from "../../../lib/session";
+import { publishToGroup } from "../../../lib/realtime";
 
 export const prerender = false;
 
@@ -28,6 +29,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       inviteCode: randomBytes(4).toString("hex").slice(0, 6).toUpperCase(),
     });
     recordActivity(viewer, { action: "group.created", result: "succeeded", groupId });
+    publishToGroup({ type: "group.changed", groupId });
     return seeOther(`/groups/${groupId}`, { notice: "Study group created. Share the invite code when you are ready." });
   } catch (error) {
     return errorResponse(error, "/#create-group");

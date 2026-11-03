@@ -1,160 +1,276 @@
 ---
 import GroupCard from "../components/GroupCard.astro";
+import RealtimePresence from "../components/RealtimePresence.astro";
 import Layout from "../layouts/Layout.astro";
-import { listJoinedGroups, listPublicGroups, siteCounts } from "../lib/db";
+import { listJoinedGroups, listPublicGroups, searchDocuments } from "../lib/db";
 import { getOrCreateViewer } from "../lib/session";
-
 export const prerender = false;
-
 const viewer = getOrCreateViewer(Astro.cookies);
-const joinedGroups = listJoinedGroups(viewer.id);
-const publicGroups = listPublicGroups(viewer.id);
-const counts = siteCounts();
-const notice = Astro.url.searchParams.get("notice");
-const error = Astro.url.searchParams.get("error");
+const joined = listJoinedGroups(viewer.id),
+  publicRooms = listPublicGroups(viewer.id);
+const view = Astro.url.searchParams.get("view") ?? "all";
+const query = (Astro.url.searchParams.get("room") ?? "").slice(0, 100);
+const rooms = (
+  view === "explore" || (view === "all" && joined.length === 0)
+    ? publicRooms
+    : view === "courses"
+      ? joined.filter((room) => room.kind === "course")
+      : joined
+).filter((room) =>
+  `${room.name} ${room.courseCode} ${room.institution}`
+    .toLowerCase()
+    .includes(query.toLowerCase()),
+);
+const discussions = searchDocuments(viewer.id, "").slice(0, 5);
 ---
 
-<Layout title="StudyNow | Ask together, remember together" {viewer} {notice} {error}>
-  <section class="home-intro">
-    <div class="intro-copy">
-      <p class="eyebrow">Live peer learning, without the spotlight</p>
-      <h1>Ask quietly.<br />Understand together.</h1>
-      <p class="intro-text">
-        Join a course or open study group, ask under a stable pseudonym, and compare more than
-        one explanation. The useful part stays here after the room goes quiet.
-      </p>
-      <div class="intro-actions">
-        <a class="primary-button" href="#groups">Find a group</a>
-        <a class="secondary-button" href="#create-group">Create a group</a>
+<Layout title="Your learning workspace | StudyNow" {viewer}>
+  <RealtimePresence groupId={0} mode="commons" />
+  <div class="workspace-shell">
+    <header class="workspace-heading">
+      <div>
+        <p class="eyebrow">
+          <span class="mini-live-dot"></span>YOUR SPACE TO FIGURE THINGS OUT
+        </p>
+        <h1>
+          {view === "explore"
+            ? "A world of shared curiosity."
+            : "Better questions. Together."}
+        </h1>
+        <p>
+          {view === "explore"
+            ? "Open rooms, different perspectives, and a seat for everyone."
+            : "A classmate's explanation might be the one that makes it click."}
+        </p>
       </div>
-      <dl class="platform-counts" aria-label="StudyNow activity">
-        <div><dt>Groups</dt><dd>{counts.groupCount}</dd></div>
-        <div><dt>Questions</dt><dd>{counts.questionCount}</dd></div>
-        <div><dt>Explanations</dt><dd>{counts.answerCount}</dd></div>
-      </dl>
-    </div>
-    <figure class="intro-visual">
-      <img
-        src="/images/study-table.jpg"
-        width="900"
-        height="600"
-        alt="Four university students comparing notes and explaining a problem around a shared table"
-      />
-      <figcaption>
-        <strong>Many explanations, one shared memory.</strong>
-      </figcaption>
-    </figure>
-  </section>
-
-  <div class="home-workspace">
-    <section class="groups-section" id="groups" aria-labelledby="groups-title">
-      <header class="section-heading">
-        <div>
-          <p class="eyebrow">Your learning spaces</p>
-          <h2 id="groups-title">Study groups</h2>
-        </div>
-        <span>{joinedGroups.length} joined</span>
-      </header>
-
-      {joinedGroups.length > 0 ? (
-        <div class="group-grid">
-          {joinedGroups.map((group) => <GroupCard {group} />)}
-        </div>
-      ) : (
-        <div class="empty-state">
-          <strong>No groups yet</strong>
-          <p>Join the public study hall below, use a course invite, or create your own group.</p>
-        </div>
-      )}
-
-      <header class="section-heading explore-heading">
-        <div>
-          <p class="eyebrow">Open to everyone</p>
-          <h2>Explore public groups</h2>
-        </div>
-      </header>
-      {publicGroups.length > 0 ? (
-        <div class="group-grid">
-          {publicGroups.map((group) => <GroupCard {group} />)}
-        </div>
-      ) : (
-        <p class="quiet-note">You have joined every public group currently available.</p>
-      )}
-    </section>
-
-    <aside class="setup-panel" aria-label="StudyNow setup">
-      <section class="setup-block" id="join-group">
-        <p class="step-number">01</p>
-        <div>
-          <h2>Join a course</h2>
-          <p>Enter the six-character code shared by your teacher or group organiser.</p>
-        </div>
-        <form class="stack-form" method="post" action="/api/groups/join">
-          <label>
-            <span>Invite code</span>
-            <input
-              class="code-input"
-              name="inviteCode"
-              type="text"
-              minlength="6"
-              maxlength="6"
-              autocomplete="off"
-              placeholder="ABC123"
-              required
-            />
-          </label>
-          <button class="primary-button" type="submit">Join study group</button>
-        </form>
-      </section>
-
-      <section class="setup-block" id="identity">
-        <p class="step-number">02</p>
-        <div>
-          <h2>Set your identity</h2>
-          <p>Your name appears only when you choose it. Anonymous posts use <strong>{viewer.anonLabel}</strong>.</p>
-        </div>
-        <form class="stack-form" method="post" action="/api/profile">
-          <label>
-            <span>Display name</span>
-            <input name="displayName" value={viewer.displayName} minlength="2" maxlength="40" required />
-          </label>
-          <button class="secondary-button" type="submit">Update name</button>
-        </form>
-      </section>
-
-      <section class="setup-block" id="create-group">
-        <p class="step-number">03</p>
-        <div>
-          <h2>Create a group</h2>
-          <p>Start a public learning space or an invite-only course room.</p>
-        </div>
-        <form class="stack-form" method="post" action="/api/groups">
-          <label>
-            <span>Group name</span>
-            <input name="name" minlength="3" maxlength="70" placeholder="Foundations of Data Science" required />
-          </label>
-          <div class="two-fields">
-            <label>
-              <span>School or community</span>
-              <input name="institution" minlength="2" maxlength="80" placeholder="ANU" required />
-            </label>
-            <label>
-              <span>Course code</span>
-              <input name="courseCode" minlength="2" maxlength="30" placeholder="COMP4020" required />
-            </label>
+      <a class="secondary-button" href="/join" data-dialog="join-dialog">
+        <i data-lucide="ticket" aria-hidden="true"></i>Join a room
+      </a>
+    </header>
+    <div class="workspace-columns">
+      <div class="workspace-primary">
+        <section class="commons-strip">
+          <div>
+            <span class="eyebrow">THE LEARNING COMMONS</span>
+            <h2>
+              Bring the question.
+              <br />
+              Find your people.
+            </h2>
+            <p>Text, sketches and those “oh, now I get it” moments.</p>
+            <a
+              class="text-action"
+              href="/groups/new"
+              data-dialog="create-dialog"
+            >
+              Start a study room
+              <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+            </a>
           </div>
-          <label>
-            <span>What will people study here?</span>
-            <textarea name="description" minlength="12" maxlength="280" rows="4" placeholder="A focused space for weekly questions, alternative explanations and revision." required></textarea>
-          </label>
-          <fieldset class="choice-field">
-            <legend>Who can find it?</legend>
-            <label><input type="radio" name="visibility" value="private" checked /> Invite only</label>
-            <label><input type="radio" name="visibility" value="public" /> Public</label>
-          </fieldset>
-          <button class="primary-button" type="submit">Create study group</button>
-        </form>
-      </section>
-    </aside>
+          <figure>
+            <img
+              src="/images/study-table.jpg"
+              width="900"
+              height="600"
+              alt="Students comparing notes and explaining a problem around a shared table"
+            />
+          </figure>
+        </section>
+        <section
+          class="rooms-section"
+          id="groups"
+          aria-labelledby="groups-title"
+        >
+          <header class="section-heading">
+            <div>
+              <h2 id="groups-title">
+                {view === "explore"
+                  ? "Explore rooms"
+                  : joined.length
+                    ? "Your rooms"
+                    : "Find your first room"}
+                <span class="count-pill" data-room-total>
+                  {rooms.length}
+                </span>
+              </h2>
+              <p>
+                {view === "explore"
+                  ? "A public place for whatever you are learning."
+                  : joined.length
+                    ? "Pick up a thread, or start a new one."
+                    : "An open door to a shared understanding."}
+              </p>
+            </div>
+            <a
+              class="icon-button"
+              href="/groups/new"
+              data-dialog="create-dialog"
+              aria-label="Create a room"
+              data-tooltip="Create room"
+            >
+              <i data-lucide="plus" aria-hidden="true"></i>
+            </a>
+          </header>
+          <div class="room-controls">
+            <nav class="view-tabs" aria-label="Room view">
+              <a href="/" class:list={{ active: view === "all" }}>
+                {joined.length ? "My rooms" : "For you"}
+              </a>
+              <a
+                href="/?view=courses"
+                class:list={{ active: view === "courses" }}
+              >
+                Courses
+              </a>
+              <a
+                href="/?view=explore"
+                class:list={{ active: view === "explore" }}
+              >
+                Explore
+              </a>
+            </nav>
+            <form class="room-search" method="get">
+              <input type="hidden" name="view" value={view} />
+              <label class="sr-only" for="room-filter">
+                Filter rooms
+              </label>
+              <i data-lucide="search" aria-hidden="true"></i>
+              <input
+                id="room-filter"
+                name="room"
+                value={query}
+                placeholder="Filter rooms..."
+              />
+              <button
+                class="icon-button"
+                type="submit"
+                aria-label="Filter rooms"
+              >
+                <i data-lucide="arrow-right" aria-hidden="true"></i>
+              </button>
+            </form>
+          </div>
+          <div data-room-grid>
+            {rooms.length ? (
+              <div class="group-grid">
+                {rooms.map((group, index) => (
+                  <GroupCard {group} {index} />
+                ))}
+              </div>
+            ) : (
+              <div class="empty-state">
+                <span class="empty-icon">
+                  <i data-lucide="door-open" aria-hidden="true"></i>
+                </span>
+                <h3>
+                  {query
+                    ? "No matching rooms"
+                    : view === "explore"
+                      ? "Room for a new beginning"
+                      : view === "courses"
+                        ? "Your next class belongs here"
+                        : "Your first room is waiting"}
+                </h3>
+                <p>
+                  {query
+                    ? "Try a subject, school or course code."
+                    : "Invite a friend, join your class, or meet someone working through the same idea."}
+                </p>
+                <a
+                  class="primary-button"
+                  href={view === "explore" ? "/groups/new" : "/?view=explore"}
+                  data-dialog={view === "explore" ? "create-dialog" : undefined}
+                >
+                  {view === "explore"
+                    ? "Create a public room"
+                    : "Explore public rooms"}
+                  <i data-lucide="arrow-right" aria-hidden="true"></i>
+                </a>
+              </div>
+            )}
+          </div>
+        </section>
+        {view !== "explore" && joined.length > 0 && publicRooms.length > 0 && (
+          <section class="open-rooms">
+            <header class="section-heading">
+              <div>
+                <p class="eyebrow">OUTSIDE YOUR CIRCLE</p>
+                <h2>Pull up a chair.</h2>
+              </div>
+              <a class="text-action" href="/?view=explore">
+                All public rooms
+                <i data-lucide="arrow-right" aria-hidden="true"></i>
+              </a>
+            </header>
+            <div class="group-grid" data-public-room-grid>
+              {publicRooms.slice(0, 4).map((group, index) => (
+                <GroupCard {group} {index} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+      <aside class="workspace-aside">
+        <section class="insight-section">
+          <span class="icon-tile blue">
+            <i data-lucide="sparkles" aria-hidden="true"></i>
+          </span>
+          <p class="eyebrow">SOMEONE MAY HAVE ASKED IT</p>
+          <h2>Find a way through.</h2>
+          <p>
+            Search ideas, not just exact words. Discover a question and compare
+            the explanations behind it.
+          </p>
+          <a class="secondary-button" href="/search">
+            Find similar questions
+            <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+          </a>
+        </section>
+        <section class="recent-section">
+          <header class="section-heading">
+            <h2>Open threads</h2>
+            <i data-lucide="message-circle" aria-hidden="true"></i>
+          </header>
+          <div data-open-threads>
+            {discussions.length ? (
+              <div class="recent-list">
+                {discussions.map((item) => (
+                  <a href={`/questions/${item.id}`}>
+                    <span class="thread-dot"></span>
+                    <div>
+                      <small>{item.courseCode}</small>
+                      <strong>{item.title}</strong>
+                      <span>
+                        {item.answerCount}{" "}
+                        {item.answerCount === 1
+                          ? "explanation"
+                          : "explanations"}
+                        <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+                      </span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p class="field-note">
+                Questions from your learning spaces will appear here.
+              </p>
+            )}
+          </div>
+        </section>
+        <section class="commons-principle">
+          <i data-lucide="venetian-mask" aria-hidden="true"></i>
+          <h3>Curiosity without the spotlight.</h3>
+          <p>
+            Your questions can be anonymous. Your understanding can belong to
+            everyone in the room.
+          </p>
+          <a class="text-action" href="/readme/">
+            The idea behind StudyNow
+            <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+          </a>
+        </section>
+      </aside>
+    </div>
   </div>
 </Layout>

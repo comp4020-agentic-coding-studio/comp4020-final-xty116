@@ -1,0 +1,467 @@
+---
+interface Props {
+  action: string;
+  mode: "question" | "answer";
+  anonLabel: string;
+}
+const { action, mode, anonLabel } = Astro.props;
+const isQuestion = mode === "question";
+const id = isQuestion ? "question-composer" : "answer-composer";
+---
+
+<form
+  class="stack-form contribution-form"
+  method="post"
+  {action}
+  enctype="multipart/form-data"
+  data-composer={id}
+>
+  {isQuestion && (
+    <label>
+      <span>Question title</span>
+      <input
+        name="title"
+        minlength="6"
+        maxlength="140"
+        placeholder="What are you trying to understand?"
+        required
+      />
+    </label>
+  )}
+  <label>
+    <span>
+      {isQuestion ? "Context & what you have tried" : "Your explanation"}
+    </span>
+    <textarea
+      name="body"
+      maxlength={isQuestion ? 1600 : 2400}
+      rows={isQuestion ? 5 : 6}
+      placeholder={
+        isQuestion
+          ? "Where does the reasoning stop making sense?"
+          : "Start with the step that made it click for you..."
+      }
+    ></textarea>
+  </label>
+  <div class="composer-tools" aria-label="Add to your contribution">
+    <button
+      class="tool-button"
+      type="button"
+      data-composer-tab="images"
+      aria-expanded="false"
+      aria-controls={`${id}-images`}
+    >
+      <i data-lucide="image-plus" aria-hidden="true"></i>Image
+    </button>
+    <button
+      class="tool-button"
+      type="button"
+      data-composer-tab="drawing"
+      aria-expanded="false"
+      aria-controls={`${id}-drawing`}
+    >
+      <i data-lucide="pen-line" aria-hidden="true"></i>Sketch
+    </button>
+    <span class="draft-indicator" data-draft-status></span>
+  </div>
+  <div
+    class="composer-media"
+    id={`${id}-images`}
+    data-media-panel="images"
+    hidden
+  >
+    <label class="upload-drop">
+      <i data-lucide="upload" aria-hidden="true"></i>
+      <strong>Add a diagram, photo or screenshot</strong>
+      <span>PNG, JPEG or WebP · 2 MB each · 3 attachments total</span>
+      <input
+        type="file"
+        name="images"
+        multiple
+        accept="image/png,image/jpeg,image/webp"
+      />
+    </label>
+    <div class="upload-previews" data-upload-previews></div>
+  </div>
+  <div
+    class="drawing-panel"
+    id={`${id}-drawing`}
+    data-media-panel="drawing"
+    hidden
+  >
+    <div class="drawing-toolbar">
+      <div class="ink-colours" aria-label="Ink colour">
+        <button
+          type="button"
+          class="ink-swatch selected"
+          data-ink="#263b37"
+          style="--swatch:#263b37"
+          aria-label="Graphite ink"
+          aria-pressed="true"
+        ></button>
+        <button
+          type="button"
+          class="ink-swatch"
+          data-ink="#315fc8"
+          style="--swatch:#315fc8"
+          aria-label="Blue ink"
+          aria-pressed="false"
+        ></button>
+        <button
+          type="button"
+          class="ink-swatch"
+          data-ink="#db554a"
+          style="--swatch:#db554a"
+          aria-label="Red ink"
+          aria-pressed="false"
+        ></button>
+        <button
+          type="button"
+          class="ink-swatch"
+          data-ink="#17805c"
+          style="--swatch:#17805c"
+          aria-label="Green ink"
+          aria-pressed="false"
+        ></button>
+      </div>
+      <label class="stroke-size">
+        <span class="sr-only">Pen width</span>
+        <input
+          type="range"
+          min="1"
+          max="7"
+          step="1"
+          value="2"
+          data-pen-width
+          aria-label="Pen width"
+        />
+      </label>
+      <button
+        type="button"
+        class="icon-button"
+        data-draw-undo
+        aria-label="Undo stroke"
+        data-tooltip="Undo"
+      >
+        <i data-lucide="undo-2" aria-hidden="true"></i>
+      </button>
+      <button
+        type="button"
+        class="icon-button"
+        data-draw-redo
+        aria-label="Redo stroke"
+        data-tooltip="Redo"
+      >
+        <i data-lucide="redo-2" aria-hidden="true"></i>
+      </button>
+      <button
+        type="button"
+        class="icon-button"
+        data-draw-clear
+        aria-label="Clear sketch"
+        data-tooltip="Clear sketch"
+      >
+        <i data-lucide="trash-2" aria-hidden="true"></i>
+      </button>
+    </div>
+    <canvas
+      class="sketch-canvas"
+      aria-label="Handwritten explanation canvas. You can also describe the same reasoning in the text field."
+      role="img"
+    ></canvas>
+    <div class="drawing-caption">
+      <span>Handwritten explanation</span>
+      <span data-sketch-status>Empty sketch</span>
+    </div>
+    <input type="hidden" name="drawingData" value="" />
+  </div>
+  <label class="attachment-description" data-description-label hidden>
+    <span>Image or sketch description</span>
+    <input
+      name="attachmentAlt"
+      maxlength="180"
+      placeholder="Describe the key idea shown in your diagram"
+    />
+    <small>Describe the visual so everyone can follow your reasoning.</small>
+  </label>
+  <label class="check-control">
+    <input type="checkbox" name="anonymous" checked />
+    <span>
+      <strong>{isQuestion ? "Ask" : "Answer"} anonymously</strong>
+      <small>Shown as {anonLabel}</small>
+    </span>
+  </label>
+  <p class="composer-error" role="alert" data-composer-error hidden></p>
+  <div class="composer-footer">
+    <span>
+      <i data-lucide="shield-check" aria-hidden="true"></i>Shared with this
+      group
+    </span>
+    <button class="primary-button" type="submit">
+      {isQuestion ? "Post question" : "Share explanation"}
+      <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+    </button>
+  </div>
+</form>
+
+<script>
+  import SignaturePad, { type PointGroup } from "signature_pad";
+
+  document
+    .querySelectorAll<HTMLFormElement>("[data-composer]")
+    .forEach((form) => {
+      const canvas = form.querySelector<HTMLCanvasElement>("canvas")!;
+      const hidden =
+        form.querySelector<HTMLInputElement>("[name=drawingData]")!;
+      const fileInput = form.querySelector<HTMLInputElement>("[name=images]")!;
+      const description = form.querySelector<HTMLElement>(
+        "[data-description-label]",
+      )!;
+      const alt = form.querySelector<HTMLInputElement>("[name=attachmentAlt]")!;
+      const error = form.querySelector<HTMLElement>("[data-composer-error]")!;
+      const draftStatus = form.querySelector<HTMLElement>(
+        "[data-draft-status]",
+      )!;
+      const sketchStatus = form.querySelector<HTMLElement>(
+        "[data-sketch-status]",
+      )!;
+      const key = `studynow:draft:${new URL(form.action).pathname}`;
+      const pad = new SignaturePad(canvas, {
+        penColor: "#263b37",
+        minWidth: 1,
+        maxWidth: 2,
+        backgroundColor: "#ffffff",
+      });
+      let undo: PointGroup[] = [];
+      let previousWidth = 0;
+      let restoring = false;
+
+      const saveDraft = () => {
+        if (restoring) return;
+        const values: Record<string, string | boolean> = {};
+        form
+          .querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+            "input:not([type=file]), textarea",
+          )
+          .forEach((field) => {
+            if (field.name)
+              values[field.name] =
+                field.type === "checkbox"
+                  ? (field as HTMLInputElement).checked
+                  : field.value;
+          });
+        try {
+          sessionStorage.setItem(
+            key,
+            JSON.stringify({
+              values,
+              drawing: pad.toData(),
+              width: previousWidth,
+            }),
+          );
+          draftStatus.textContent = "Draft saved";
+        } catch {
+          draftStatus.textContent = "Draft on this page";
+        }
+      };
+      const updateMedia = () => {
+        const count =
+          (fileInput.files?.length ?? 0) + Number(Boolean(hidden.value));
+        description.hidden = count === 0;
+        alt.required = count > 0;
+        sketchStatus.textContent = hidden.value
+          ? "Included in your post"
+          : "Empty sketch";
+      };
+      const syncSketch = () => {
+        hidden.value = pad.isEmpty() ? "" : pad.toDataURL("image/png");
+        updateMedia();
+        saveDraft();
+      };
+      const resize = () => {
+        const width = Math.round(canvas.getBoundingClientRect().width);
+        if (width <= 0 || width === previousWidth) return;
+        const groups = pad.toData();
+        const scale = previousWidth ? width / previousWidth : 1;
+        for (const group of groups)
+          for (const point of group.points) {
+            point.x *= scale;
+            point.y *= scale;
+          }
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(width * ratio);
+        canvas.height = Math.round(width * 0.62 * ratio);
+        canvas.getContext("2d")?.scale(ratio, ratio);
+        previousWidth = width;
+        pad.clear();
+        pad.fromData(groups);
+        if (groups.length) syncSketch();
+      };
+      new ResizeObserver(resize).observe(canvas);
+      pad.addEventListener("endStroke", () => {
+        undo = [];
+        syncSketch();
+      });
+      form
+        .querySelectorAll<HTMLButtonElement>("[data-composer-tab]")
+        .forEach((button) =>
+          button.addEventListener("click", () => {
+            const panel = form.querySelector<HTMLElement>(
+              `[data-media-panel="${button.dataset.composerTab}"]`,
+            )!;
+            panel.hidden = !panel.hidden;
+            button.setAttribute("aria-expanded", String(!panel.hidden));
+            if (!panel.hidden && button.dataset.composerTab === "drawing")
+              requestAnimationFrame(resize);
+          }),
+        );
+      form.querySelectorAll<HTMLButtonElement>("[data-ink]").forEach((button) =>
+        button.addEventListener("click", () => {
+          pad.penColor = button.dataset.ink!;
+          form.querySelectorAll("[data-ink]").forEach((other) => {
+            other.classList.toggle("selected", other === button);
+            other.setAttribute("aria-pressed", String(other === button));
+          });
+        }),
+      );
+      form
+        .querySelector<HTMLInputElement>("[data-pen-width]")!
+        .addEventListener("input", (event) => {
+          const width = Number((event.target as HTMLInputElement).value);
+          pad.minWidth = Math.max(0.6, width * 0.5);
+          pad.maxWidth = width;
+        });
+      form.querySelector("[data-draw-undo]")!.addEventListener("click", () => {
+        const data = pad.toData(),
+          last = data.pop();
+        if (last) undo.push(last);
+        pad.fromData(data);
+        syncSketch();
+      });
+      form.querySelector("[data-draw-redo]")!.addEventListener("click", () => {
+        const group = undo.pop();
+        if (group) pad.fromData([...pad.toData(), group]);
+        syncSketch();
+      });
+      form.querySelector("[data-draw-clear]")!.addEventListener("click", () => {
+        undo = [...pad.toData()].reverse();
+        pad.clear();
+        syncSketch();
+      });
+      fileInput.addEventListener("change", () => {
+        const previews = form.querySelector<HTMLElement>(
+          "[data-upload-previews]",
+        )!;
+        previews.replaceChildren();
+        const files = [...(fileInput.files ?? [])];
+        files.forEach((file, index) => {
+          const figure = document.createElement("figure"),
+            image = document.createElement("img"),
+            remove = document.createElement("button");
+          const objectUrl = URL.createObjectURL(file);
+          image.src = objectUrl;
+          image.alt = file.name;
+          image.onload = () => URL.revokeObjectURL(objectUrl);
+          remove.type = "button";
+          remove.className = "remove-upload";
+          remove.textContent = "×";
+          remove.setAttribute("aria-label", `Remove ${file.name}`);
+          remove.addEventListener("click", () => {
+            const transfer = new DataTransfer();
+            files
+              .filter((_, i) => i !== index)
+              .forEach((item) => transfer.items.add(item));
+            fileInput.files = transfer.files;
+            fileInput.dispatchEvent(new Event("change"));
+          });
+          figure.append(image, remove);
+          previews.append(figure);
+        });
+        updateMedia();
+        saveDraft();
+      });
+      form.addEventListener("input", saveDraft);
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(key) ?? "null");
+        if (saved?.values) {
+          restoring = true;
+          for (const [name, value] of Object.entries(saved.values)) {
+            const field = form.elements.namedItem(name) as
+              HTMLInputElement | HTMLTextAreaElement | null;
+            if (field && typeof value === "string") field.value = value;
+            else if (
+              field instanceof HTMLInputElement &&
+              field.type === "checkbox"
+            )
+              field.checked = Boolean(value);
+          }
+          if (saved.drawing?.length) {
+            previousWidth = saved.width;
+            pad.fromData(saved.drawing);
+            const panel = form.querySelector<HTMLElement>(
+              "[data-media-panel=drawing]",
+            )!;
+            panel.hidden = false;
+            form
+              .querySelector("[data-composer-tab=drawing]")
+              ?.setAttribute("aria-expanded", "true");
+            requestAnimationFrame(resize);
+          }
+          draftStatus.textContent = "Draft restored";
+          restoring = false;
+          updateMedia();
+        }
+      } catch {
+        restoring = false;
+      }
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        error.hidden = true;
+        const body = form
+          .querySelector<HTMLTextAreaElement>("[name=body]")!
+          .value.trim();
+        const files = [...(fileInput.files ?? [])];
+        const count = files.length + Number(Boolean(hidden.value));
+        if (
+          (!count && body.length < 8) ||
+          count > 3 ||
+          files.some((file) => file.size > 2 * 1024 * 1024)
+        ) {
+          error.textContent =
+            count > 3
+              ? "Keep up to three images or sketches."
+              : files.some((file) => file.size > 2 * 1024 * 1024)
+                ? "Each image must be 2 MB or smaller."
+                : "Add a little context, an image or a sketch before posting.";
+          error.hidden = false;
+          return;
+        }
+        const submit = form.querySelector<HTMLButtonElement>("[type=submit]")!;
+        submit.disabled = true;
+        submit.setAttribute("aria-busy", "true");
+        saveDraft();
+        try {
+          const response = await fetch(form.action, {
+            method: "POST",
+            body: new FormData(form),
+          });
+          const destination = new URL(response.url);
+          if (!response.ok || destination.searchParams.has("error"))
+            throw new Error(
+              destination.searchParams.get("error") ??
+                "Your post could not be saved. Your draft is still here.",
+            );
+          sessionStorage.removeItem(key);
+          window.location.assign(destination.href);
+        } catch (reason) {
+          error.textContent =
+            reason instanceof Error
+              ? reason.message
+              : "Connection interrupted. Your draft is still here.";
+          error.hidden = false;
+          submit.disabled = false;
+          submit.removeAttribute("aria-busy");
+        }
+      });
+    });
+</script>

@@ -15,8 +15,17 @@ explanations can coexist, and today's help remains useful tomorrow.
 - Preserve different explanations instead of collapsing them into one ranked
   answer. Do not add popularity scores, follower counts, streaks, or other
   mechanics that make asking for help performative.
-- Be honest about scope. Invite links are a prototype for enrolment, not an
-  integration with a university identity or learning-management system.
+- Distinguish course organisation from verified employment or enrolment.
+  A room's creator can generate and export a class invitation list. Individual
+  invitations are single-use; possession of a reusable room code permits joining.
+  Roster labels and personal invitation links are visible only to the organiser.
+- Support text, images and handwritten explanations without requiring a prose
+  transcript. Require an image description, validate image bytes and upload
+  limits, and authorise attachment reads through the parent room.
+- Retrieve existing discussions rather than generate an authoritative homework
+  answer. Authorise candidates before sending excerpts to a model, validate
+  returned IDs against that candidate set, and label fallback keyword results.
+  Keep credentials server-side and require no visitor key or payment.
 
 ## Engineering rules
 
@@ -27,6 +36,9 @@ explanations can coexist, and today's help remains useful tomorrow.
 - SQLite remains authoritative for questions and answers. In-memory state may
   fan out events and count current connections, but reconnecting clients must
   rebuild their view from SQLite rather than depend on missed events.
+- Store image and drawing bytes in the same persistent database as their parent
+  contribution, in one transaction. Read [ADR 004](docs/adr-004-visual-retrieval.md)
+  before changing media storage, model retrieval or invitation identity.
 - Authorise every read and write on the server. A hidden button is not an
   access-control rule.
 - Keep the no-JavaScript form path usable. JavaScript may add live updates in
@@ -57,6 +69,12 @@ explanations can coexist, and today's help remains useful tomorrow.
   its draft.
 - Keep controls stable and text readable. Every visible action must work; do
   not ship disabled previews of future image, drawing, AI, or real-time tools.
+- Preserve text and sketch drafts through resizing and navigation. A successful
+  post clears its own draft; failures retain it and report an actionable error.
+  Realtime patches may replace only display regions, never a contribution form.
+- Provide working pen colours, pen width, undo, redo, clear, image removal,
+  invitation copying and CSV export. Sanitize spreadsheet formula prefixes in
+  exported roster labels. Use native dialog focus and Escape handling.
 
 ## Verification rules
 
@@ -66,5 +84,10 @@ explanations can coexist, and today's help remains useful tomorrow.
 - Run `pnpm check` and `pnpm check:evidence` before each deploy.
 - Test a second independent session, a reload, a server restart, and both
   marking viewports before calling a milestone complete.
+- Validate search privacy, external model failures and untrusted source IDs
+  through the public HTTP interface. An upstream test double verifies the
+  integration boundary; it does not establish that production AI is connected.
+- Keep the first README section a free, browser-only marking journey. Report
+  actual live verification separately from local and simulated-upstream tests.
 - Never commit credentials, local databases, build output, or
   `mise.local.toml`.

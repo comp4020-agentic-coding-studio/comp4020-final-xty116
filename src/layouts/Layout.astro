@@ -1,24 +1,25 @@
 ---
-import type { Viewer } from "../lib/db";
-import "../styles.css";
-
+import { listJoinedGroups, type Viewer } from "../lib/db";
+import SetupForm from "../components/SetupForm.astro";
+import "../workspace.css";
 interface Props {
   title: string;
   description?: string;
   viewer: Viewer;
-  active?: "groups" | "about";
+  active?: "groups" | "about" | "search";
   notice?: string | null;
   error?: string | null;
 }
-
 const {
   title,
-  description = "StudyNow turns live peer questions into a reusable learning commons.",
+  description = "A shared place to ask, sketch, compare explanations and find understanding together.",
   viewer,
   active = "groups",
-  notice,
-  error,
+  notice = Astro.url.searchParams.get("notice"),
+  error = Astro.url.searchParams.get("error"),
 } = Astro.props;
+const rooms = listJoinedGroups(viewer.id).slice(0, 6);
+const path = Astro.url.pathname;
 ---
 
 <!doctype html>
@@ -27,45 +28,441 @@ const {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#18352e" />
+    <meta name="theme-color" content="#f6f8f7" />
+    <meta name="referrer" content="same-origin" />
     <title>{title}</title>
   </head>
   <body>
-    <a class="skip-link" href="#main-content">Skip to content</a>
-    <header class="site-header">
+    <a class="skip-link" href="#main-content">
+      Skip to content
+    </a>
+    <aside class="app-sidebar" aria-label="Workspace navigation">
       <a class="brand" href="/" aria-label="StudyNow home">
-        <span class="brand-mark" aria-hidden="true">S</span>
-        <span><strong>StudyNow</strong><small>Learning commons</small></span>
+        <span class="brand-mark">
+          <i data-lucide="notebook-pen" aria-hidden="true"></i>
+        </span>
+        <span>
+          <strong>
+            StudyNow<span class="brand-period">.</span>
+          </strong>
+          <small>A little help. A lot of possibility.</small>
+        </span>
       </a>
-      <nav aria-label="Primary navigation">
-        <a class:list={{ active: active === "groups" }} href="/#groups">Study groups</a>
-        <a href="/#join-group">Join with code</a>
-        <a class:list={{ active: active === "about" }} href="/readme/">What good means</a>
+      <p class="nav-label">WORKSPACE</p>
+      <nav class="primary-nav" aria-label="Primary navigation">
+        <a
+          class:list={{
+            active:
+              active === "groups" &&
+              path === "/" &&
+              Astro.url.searchParams.get("view") !== "explore",
+          }}
+          href="/"
+        >
+          <i data-lucide="layout-grid" aria-hidden="true"></i>Your workspace
+        </a>
+        <a
+          class:list={{
+            active: Astro.url.searchParams.get("view") === "explore",
+          }}
+          href="/?view=explore"
+        >
+          <i data-lucide="globe-2" aria-hidden="true"></i>Explore rooms
+          <span class="nav-dot"></span>
+        </a>
+        <a class:list={{ active: active === "search" }} href="/search">
+          <i data-lucide="sparkles" aria-hidden="true"></i>Find understanding
+        </a>
+        <a href="/join" data-dialog="join-dialog">
+          <i data-lucide="ticket" aria-hidden="true"></i>Join with a code
+        </a>
       </nav>
-      <div class="viewer-chip" title={`Anonymous posts appear as ${viewer.anonLabel}`}>
-        <span aria-hidden="true">{viewer.displayName.slice(0, 1).toUpperCase()}</span>
-        <div><strong>{viewer.displayName}</strong><small>{viewer.anonLabel}</small></div>
+      <div class="sidebar-rooms">
+        <div class="nav-label-row">
+          <p class="nav-label">YOUR ROOMS</p>
+          <a
+            class="icon-button"
+            href="/groups/new"
+            data-dialog="create-dialog"
+            aria-label="Create a room"
+            data-tooltip="Create room"
+          >
+            <i data-lucide="plus" aria-hidden="true"></i>
+          </a>
+        </div>
+        {rooms.length ? (
+          rooms.map((room, i) => (
+            <a
+              class:list={[
+                "sidebar-room",
+                { active: path === `/groups/${room.id}` },
+              ]}
+              href={`/groups/${room.id}`}
+            >
+              <span class:list={["room-monogram", `accent-${i % 4}`]}>
+                {room.courseCode.slice(0, 2)}
+              </span>
+              <span>
+                {room.name}
+                <small>{room.courseCode}</small>
+              </span>
+              {room.visibility === "private" && (
+                <i data-lucide="lock-keyhole" aria-hidden="true"></i>
+              )}
+            </a>
+          ))
+        ) : (
+          <p class="sidebar-empty">Your learning spaces will live here.</p>
+        )}
       </div>
-    </header>
-
-    {(notice || error) && (
-      <div class:list={["status-banner", { error: Boolean(error) }]} role="status" aria-live="polite">
-        <strong>{error ? "Needs attention" : "Done"}</strong>
-        <p>{error ?? notice}</p>
-        <a href={Astro.url.pathname}>Dismiss</a>
+      <div class="sidebar-bottom">
+        <a
+          class:list={["about-nav", { active: active === "about" }]}
+          href="/readme/"
+        >
+          <i data-lucide="book-open" aria-hidden="true"></i>About this commons
+          <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+        </a>
+        <a class="viewer-chip" href="/profile" data-dialog="profile-dialog">
+          <span class="avatar">
+            {viewer.anonLabel.replace("Anonymous ", "").slice(0, 1)}
+          </span>
+          <span>
+            <strong>{viewer.displayName}</strong>
+            <small>{viewer.anonLabel}</small>
+          </span>
+          <i data-lucide="settings-2" aria-hidden="true"></i>
+        </a>
       </div>
-    )}
-
-    <main id="main-content">
-      <slot />
-    </main>
-
-    <footer class="site-footer">
-      <p><strong>StudyNow</strong> · Questions can be quiet. Knowledge should not disappear.</p>
-      <nav aria-label="Footer navigation">
-        <a href="/">Groups</a>
-        <a href="/readme/">README</a>
-      </nav>
-    </footer>
+    </aside>
+    <div class="app-content">
+      <header class="topbar">
+        <a class="mobile-brand" href="/">
+          StudyNow<span>.</span>
+        </a>
+        <div class="topbar-context">
+          <i
+            data-lucide={
+              active === "about"
+                ? "book-open"
+                : active === "search"
+                  ? "sparkles"
+                  : "panel-left"
+            }
+            aria-hidden="true"
+          ></i>
+          <span>
+            {active === "about"
+              ? "The idea behind the app"
+              : active === "search"
+                ? "Shared knowledge"
+                : "Your learning commons"}
+          </span>
+        </div>
+        <form class="global-search" method="get" action="/search">
+          <i data-lucide="search" aria-hidden="true"></i>
+          <label class="sr-only" for="global-query">
+            Search questions and explanations
+          </label>
+          <input
+            id="global-query"
+            name="q"
+            placeholder="Find a question, an idea, a way through..."
+            maxlength="500"
+          />
+          <button class="icon-button" type="submit" aria-label="Search">
+            <i data-lucide="arrow-right" aria-hidden="true"></i>
+          </button>
+        </form>
+        <a
+          class="topbar-create primary-button small"
+          href="/groups/new"
+          data-dialog="create-dialog"
+        >
+          <i data-lucide="plus" aria-hidden="true"></i>
+          <span>Create room</span>
+        </a>
+      </header>
+      {(notice || error) && (
+        <div
+          class:list={["status-banner", { error: Boolean(error) }]}
+          role="status"
+          aria-live="polite"
+        >
+          <i
+            data-lucide={error ? "circle-alert" : "circle-check"}
+            aria-hidden="true"
+          ></i>
+          <p>{error ?? notice}</p>
+          <a class="icon-button" href={path} aria-label="Dismiss notification">
+            <i data-lucide="x" aria-hidden="true"></i>
+          </a>
+        </div>
+      )}
+      <main id="main-content">
+        <slot />
+      </main>
+      <footer class="site-footer">
+        <p>Made for the moment something clicks.</p>
+        <a href="/readme/">
+          StudyNow · a learning commons
+          <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+        </a>
+      </footer>
+    </div>
+    <nav class="mobile-nav" aria-label="Mobile navigation">
+      <a href="/" class:list={{ active: active === "groups" }}>
+        <i data-lucide="layout-grid" aria-hidden="true"></i>Rooms
+      </a>
+      <a href="/?view=explore">
+        <i data-lucide="globe-2" aria-hidden="true"></i>Explore
+      </a>
+      <a href="/search" class:list={{ active: active === "search" }}>
+        <i data-lucide="sparkles" aria-hidden="true"></i>Search
+      </a>
+      <a href="/join" data-dialog="join-dialog">
+        <i data-lucide="ticket" aria-hidden="true"></i>Join
+      </a>
+      <a href="/profile" data-dialog="profile-dialog">
+        <i data-lucide="circle-user-round" aria-hidden="true"></i>You
+      </a>
+    </nav>
+    {(
+      [
+        {
+          id: "create-dialog",
+          mode: "create",
+          title: "Create a room",
+          subtitle: "Bring a friend. Bring your whole class.",
+        },
+        {
+          id: "join-dialog",
+          mode: "join",
+          title: "Join your people",
+          subtitle: "A shared question is a good place to start.",
+        },
+        {
+          id: "profile-dialog",
+          mode: "profile",
+          title: "Your identity",
+          subtitle: "Be yourself. Keep a little privacy.",
+        },
+      ] as const
+    ).map((dialog) => (
+      <dialog
+        id={dialog.id}
+        class="setup-dialog"
+        aria-labelledby={`${dialog.id}-title`}
+      >
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">STUDYNOW</p>
+            <h2 id={`${dialog.id}-title`}>{dialog.title}</h2>
+            <p>{dialog.subtitle}</p>
+          </div>
+          <button
+            class="icon-button"
+            type="button"
+            data-close-dialog
+            aria-label="Close dialog"
+          >
+            <i data-lucide="x" aria-hidden="true"></i>
+          </button>
+        </div>
+        <SetupForm mode={dialog.mode} {viewer} />
+      </dialog>
+    ))}
+    <div class="toast" role="status" aria-live="polite" data-toast hidden></div>
   </body>
 </html>
+<script>
+  import {
+    createIcons,
+    NotebookPen,
+    LayoutGrid,
+    Globe2,
+    Sparkles,
+    Ticket,
+    Plus,
+    LockKeyhole,
+    BookOpen,
+    ArrowUpRight,
+    Settings2,
+    PanelLeft,
+    Search,
+    ArrowRight,
+    CircleAlert,
+    CircleCheck,
+    X,
+    CircleUserRound,
+    Users,
+    GraduationCap,
+    Check,
+    ChevronDown,
+    UserPlus,
+    Copy,
+    ListPlus,
+    Download,
+    Image,
+    PenLine,
+    ImagePlus,
+    Upload,
+    Undo2,
+    Redo2,
+    Trash2,
+    ShieldCheck,
+    ArrowUp,
+    CheckCheck,
+    MessageCircle,
+    Clock3,
+    ArrowLeft,
+    SlidersHorizontal,
+    Send,
+    Filter,
+    Hash,
+    DoorOpen,
+    Lightbulb,
+    ArrowDown,
+    ExternalLink,
+    RefreshCw,
+    VenetianMask,
+  } from "lucide";
+  const icons = {
+    NotebookPen,
+    LayoutGrid,
+    Globe2,
+    Sparkles,
+    Ticket,
+    Plus,
+    LockKeyhole,
+    BookOpen,
+    ArrowUpRight,
+    Settings2,
+    PanelLeft,
+    Search,
+    ArrowRight,
+    CircleAlert,
+    CircleCheck,
+    X,
+    CircleUserRound,
+    Users,
+    GraduationCap,
+    Check,
+    ChevronDown,
+    UserPlus,
+    Copy,
+    ListPlus,
+    Download,
+    Image,
+    PenLine,
+    ImagePlus,
+    Upload,
+    Undo2,
+    Redo2,
+    Trash2,
+    ShieldCheck,
+    ArrowUp,
+    CheckCheck,
+    MessageCircle,
+    Clock3,
+    ArrowLeft,
+    SlidersHorizontal,
+    Send,
+    Filter,
+    Hash,
+    DoorOpen,
+    Lightbulb,
+    ArrowDown,
+    ExternalLink,
+    RefreshCw,
+    VenetianMask,
+  };
+  const renderIcons = () =>
+    createIcons({ icons, attrs: { "stroke-width": 1.7 } });
+  renderIcons();
+  document.addEventListener("studynow:updated", renderIcons);
+  let toastTimer: ReturnType<typeof setTimeout>;
+  const toast = (message: string) => {
+    const node = document.querySelector<HTMLElement>("[data-toast]")!;
+    node.textContent = message;
+    node.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (node.hidden = true), 3000);
+  };
+  document
+    .querySelectorAll<HTMLAnchorElement>("[data-dialog]")
+    .forEach((link) =>
+      link.addEventListener("click", (event) => {
+        const dialog = document.getElementById(
+          link.dataset.dialog!,
+        ) as HTMLDialogElement | null;
+        if (dialog) {
+          event.preventDefault();
+          dialog.showModal();
+        }
+      }),
+    );
+  document.querySelectorAll<HTMLDialogElement>("dialog").forEach((dialog) => {
+    dialog
+      .querySelector("[data-close-dialog]")
+      ?.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) {
+        const box = dialog.getBoundingClientRect();
+        if (
+          event.clientX < box.left ||
+          event.clientX > box.right ||
+          event.clientY < box.top ||
+          event.clientY > box.bottom
+        )
+          dialog.close();
+      }
+    });
+  });
+  document.addEventListener("click", async (event) => {
+    const target =
+      event.target instanceof Element
+        ? event.target.closest<HTMLElement>("[data-copy], [data-invite-export]")
+        : null;
+    if (!target) return;
+    if (target.dataset.copy) {
+      try {
+        await navigator.clipboard.writeText(target.dataset.copy);
+        toast("Invitation link copied");
+      } catch {
+        const field = document.createElement("textarea");
+        field.value = target.dataset.copy;
+        field.setAttribute("aria-label", "Invitation link to copy");
+        field.className = "clipboard-fallback";
+        document.body.append(field);
+        field.focus({ preventScroll: true });
+        field.select();
+        field.addEventListener("blur", () => field.remove(), { once: true });
+        toast("Copy is unavailable. The invitation link is selected for you.");
+      }
+    } else if (target.hasAttribute("data-invite-export")) {
+      const rows = JSON.parse(target.dataset.rows ?? "[]") as {
+        student: string;
+        link: string;
+        status: string;
+      }[];
+      const cell = (value: string) =>
+        `"${(/^[=+@-]/.test(value) ? "'" : "") + value.replaceAll('"', '""')}"`;
+      const csv = [
+        "Student,Invitation,Status",
+        ...rows.map((row) =>
+          [row.student, row.link, row.status].map(cell).join(","),
+        ),
+      ].join("\r\n");
+      const url = URL.createObjectURL(
+        new Blob([csv], { type: "text/csv;charset=utf-8" }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "studynow-class-invitations.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("Invitation list downloaded");
+    }
+  });
+</script>

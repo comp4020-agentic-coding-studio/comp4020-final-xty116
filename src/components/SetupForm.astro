@@ -1,0 +1,134 @@
+---
+import type { Viewer } from "../lib/db";
+interface Props {
+  mode: "create" | "join" | "profile";
+  viewer: Viewer;
+}
+const { mode, viewer } = Astro.props;
+---
+
+{mode === "create" ? (
+  <form class="stack-form" method="post" action="/api/groups">
+    <label>
+      <span>Room name</span>
+      <input
+        name="name"
+        minlength="3"
+        maxlength="70"
+        placeholder="e.g. Linear algebra, together"
+        required
+      />
+    </label>
+    <fieldset class="segmented-choice">
+      <legend>Room type</legend>
+      <label>
+        <input type="radio" name="kind" value="study" checked />
+        <span>
+          <i data-lucide="users" aria-hidden="true"></i>Study group
+        </span>
+      </label>
+      <label>
+        <input type="radio" name="kind" value="course" />
+        <span>
+          <i data-lucide="graduation-cap" aria-hidden="true"></i>Course room
+        </span>
+      </label>
+    </fieldset>
+    <div class="two-fields">
+      <label>
+        <span>School or community</span>
+        <input
+          name="institution"
+          minlength="2"
+          maxlength="80"
+          placeholder="Australian National University"
+          required
+        />
+      </label>
+      <label>
+        <span>Course or subject</span>
+        <input
+          name="courseCode"
+          minlength="2"
+          maxlength="30"
+          placeholder="MATH1013"
+          required
+        />
+      </label>
+    </div>
+    <label>
+      <span>About this room</span>
+      <textarea
+        name="description"
+        minlength="12"
+        maxlength="280"
+        rows="3"
+        placeholder="What are you learning, and who is this space for?"
+        required
+      ></textarea>
+    </label>
+    <fieldset class="segmented-choice">
+      <legend>Who can discover it?</legend>
+      <label>
+        <input type="radio" name="visibility" value="private" checked />
+        <span>
+          <i data-lucide="lock-keyhole" aria-hidden="true"></i>Invite only
+        </span>
+      </label>
+      <label>
+        <input type="radio" name="visibility" value="public" />
+        <span>
+          <i data-lucide="globe-2" aria-hidden="true"></i>Everyone
+        </span>
+      </label>
+    </fieldset>
+    <p class="field-note">
+      A room starts with you. Share its invite link to bring a friend or your
+      whole class.
+    </p>
+    <button class="primary-button" type="submit">
+      Create room<i data-lucide="arrow-right" aria-hidden="true"></i>
+    </button>
+  </form>
+) : mode === "join" ? (
+  <form class="stack-form" method="post" action="/api/groups/join">
+    <label>
+      <span>Six-character invite code</span>
+      <input
+        class="code-input"
+        name="inviteCode"
+        minlength="6"
+        maxlength="6"
+        autocomplete="off"
+        placeholder="ABC123"
+        required
+      />
+    </label>
+    <button class="primary-button" type="submit">
+      Join room<i data-lucide="arrow-right" aria-hidden="true"></i>
+    </button>
+  </form>
+) : (
+  <form class="stack-form" method="post" action="/api/profile">
+    <label>
+      <span>Display name</span>
+      <input
+        name="displayName"
+        value={viewer.displayName}
+        minlength="2"
+        maxlength="40"
+        required
+      />
+    </label>
+    <div class="identity-note">
+      <i data-lucide="venetian-mask" aria-hidden="true"></i>
+      <p>
+        Anonymous posts appear as <strong>{viewer.anonLabel}</strong>. This name
+        stays with this browser profile.
+      </p>
+    </div>
+    <button class="primary-button" type="submit">
+      Save identity<i data-lucide="check" aria-hidden="true"></i>
+    </button>
+  </form>
+)}

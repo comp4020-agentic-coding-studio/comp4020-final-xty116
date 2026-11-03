@@ -1,13 +1,35 @@
 ---
 import type { AttachmentView } from "../lib/db";
-interface Props { attachments: AttachmentView[] }
+interface Props {
+  attachments: AttachmentView[];
+}
 const { attachments } = Astro.props;
 ---
-{attachments.length > 0 && <div class="attachments">
-  {attachments.map(item => <figure class:list={["attachment", item.kind]}>
-    <a href={`/api/attachments/${item.id}`} target="_blank" rel="noopener" aria-label={`Open image: ${item.alt}`}>
-      <img src={`/api/attachments/${item.id}`} alt={item.alt} loading="lazy" />
-    </a>
-    <figcaption><i data-lucide={item.kind === "drawing" ? "pen-line" : "image"} aria-hidden="true"></i>{item.alt}</figcaption>
-  </figure>)}
-</div>}
+
+{attachments.length > 0 && (
+  <div class="attachments">
+    {attachments.map((item) => (
+      <figure class:list={["attachment", item.kind]}>
+        <a
+          href={`/api/attachments/${item.id}`}
+          target="_blank"
+          rel="noopener"
+          aria-label={`Open image: ${item.alt}`}
+        >
+          <img
+            src={`/api/attachments/${item.id}`}
+            alt={item.alt}
+            loading="lazy"
+          />
+        </a>
+        <figcaption>
+          <i
+            data-lucide={item.kind === "drawing" ? "pen-line" : "image"}
+            aria-hidden="true"
+          ></i>
+          {item.alt}
+        </figcaption>
+      </figure>
+    ))}
+  </div>
+)}

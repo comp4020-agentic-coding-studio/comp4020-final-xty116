@@ -1,0 +1,210 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { keywordSearch } from "../lib/search";
+import { getOrCreateViewer } from "../lib/session";
+import { getGroup } from "../lib/db";
+import { excerpt } from "../lib/format";
+export const prerender = false;
+const viewer = getOrCreateViewer(Astro.cookies);
+const query = (Astro.url.searchParams.get("q") ?? "").slice(0, 500);
+const groupId = /^\d+$/.test(Astro.url.searchParams.get("groupId") ?? "")
+  ? Number(Astro.url.searchParams.get("groupId"))
+  : undefined;
+const group = groupId ? getGroup(groupId, viewer.id) : undefined;
+const result =
+  query.trim().length >= 2
+    ? keywordSearch(viewer.id, query, groupId)
+    : undefined;
+---
+
+<Layout title="Find understanding | StudyNow" {viewer} active="search">
+  <div class="workspace-shell search-shell">
+    <header class="search-heading">
+      <span class="icon-tile blue">
+        <i data-lucide="sparkles" aria-hidden="true"></i>
+      </span>
+      <p class="eyebrow">THE QUESTION MIGHT BE NEW TO YOU.</p>
+      <h1>Find a way through.</h1>
+      <p>
+        Different wording. The same idea. Find a related question, compare peer
+        explanations, and keep building on what someone else worked out.
+      </p>
+    </header>
+    <form
+      class="knowledge-search"
+      method="get"
+      action="/search"
+      data-knowledge-search
+    >
+      <div class="knowledge-search-bar">
+        <i data-lucide="search" aria-hidden="true"></i>
+        <label class="sr-only" for="knowledge-query">
+          What are you trying to understand?
+        </label>
+        <input
+          id="knowledge-query"
+          name="q"
+          value={query}
+          minlength="2"
+          maxlength="500"
+          placeholder="What are you trying to understand?"
+          required
+        />
+        <button class="primary-button" type="submit">
+          <i data-lucide="search" aria-hidden="true"></i>Find questions
+        </button>
+      </div>
+      {groupId && <input name="groupId" type="hidden" value={groupId} />}
+      <div class="search-mode-row">
+        <fieldset class="search-modes">
+          <legend class="sr-only">Search mode</legend>
+          <label>
+            <input type="radio" name="mode" value="keyword" checked />
+            Keyword
+          </label>
+          <label>
+            <input type="radio" name="mode" value="ai" />
+            AI · match the idea
+          </label>
+        </fieldset>
+        <p class="search-privacy">
+          AI sends your query and excerpts of accessible questions to the
+          configured model. Drafts, images, names and invite codes stay out.
+        </p>
+      </div>
+      {group && (
+        <p class="field-note" style="margin-top:12px">
+          Searching in {group.name}.{" "}
+          <a class="text-action" href="/search">
+            Search all accessible rooms
+            <i data-lucide="arrow-right" aria-hidden="true"></i>
+          </a>
+        </p>
+      )}
+    </form>
+    <div
+      class="search-loading"
+      data-search-loading
+      role="status"
+      aria-live="polite"
+      hidden
+    >
+      <i data-lucide="refresh-cw" aria-hidden="true"></i>Connecting ideas across
+      your learning spaces...
+    </div>
+    <p
+      class="search-status"
+      data-search-status
+      role="status"
+      aria-live="polite"
+    >
+      <i data-lucide="book-open" aria-hidden="true"></i>
+      <span>
+        {result?.message ??
+          "Search public rooms and the private rooms you belong to."}
+      </span>
+    </p>
+    <div class="search-results" data-search-results>
+      {result?.results.map((item) => (
+        <a class="search-result" href={`/questions/${item.id}`}>
+          <div class="result-meta">
+            <span>
+              {item.courseCode} · {item.groupName}
+            </span>
+            <span>{item.answerCount} explanations</span>
+          </div>
+          <h2>{item.title}</h2>
+          <p>{excerpt(item.body, 260)}</p>
+        </a>
+      ))}
+    </div>
+    {!query && (
+      <div class="search-suggestions" aria-label="Search suggestions">
+        {[
+          "Why does a derivative measure change?",
+          "Recursion and base cases",
+          "How to explain an idea clearly",
+        ].map((value) => (
+          <button type="button" data-search-suggestion={value}>
+            {value}
+            <span aria-hidden="true"> ↗</span>
+          </button>
+        ))}
+      </div>
+    )}
+  </div>
+</Layout>
+<script>
+  const form = document.querySelector<HTMLFormElement>(
+    "[data-knowledge-search]",
+  )!;
+  const query = form.querySelector<HTMLInputElement>("[name=q]")!;
+  const results = document.querySelector<HTMLElement>("[data-search-results]")!;
+  const status = document.querySelector<HTMLElement>(
+    "[data-search-status] span",
+  )!;
+  const loading = document.querySelector<HTMLElement>("[data-search-loading]")!;
+  const button = form.querySelector<HTMLButtonElement>("[type=submit]")!;
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-search-suggestion]")
+    .forEach((suggestion) =>
+      suggestion.addEventListener("click", () => {
+        query.value = suggestion.dataset.searchSuggestion!;
+        form.requestSubmit();
+      }),
+    );
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    loading.hidden = false;
+    button.disabled = true;
+    results.setAttribute("aria-busy", "true");
+    const fields = new FormData(form);
+    try {
+      const response = await fetch("/api/search", {
+        method: "POST",
+        body: fields,
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(
+          data.error ?? "Search is unavailable. Try again shortly.",
+        );
+      status.textContent = `${data.mode === "ai" ? "AI matched · " : "Keyword · "}${data.message}`;
+      results.replaceChildren();
+      for (const item of data.results) {
+        const link = document.createElement("a"),
+          meta = document.createElement("div"),
+          heading = document.createElement("h2"),
+          body = document.createElement("p");
+        link.className = "search-result";
+        link.href = `/questions/${Number(item.id)}`;
+        meta.className = "result-meta";
+        meta.textContent = `${item.courseCode} · ${item.groupName} · ${item.answerCount} explanations`;
+        heading.textContent = item.title;
+        body.textContent =
+          item.body.length > 260 ? item.body.slice(0, 260) + "..." : item.body;
+        link.append(meta, heading, body);
+        if (item.reason) {
+          const reason = document.createElement("div");
+          reason.className = "match-reason";
+          reason.textContent = `Related idea: ${item.reason}`;
+          link.append(reason);
+        }
+        results.append(link);
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.set("q", query.value);
+      history.replaceState({}, "", url);
+      document.querySelector(".search-suggestions")?.remove();
+    } catch (error) {
+      status.textContent =
+        error instanceof Error
+          ? error.message
+          : "Search interrupted. Your query is still here.";
+    } finally {
+      loading.hidden = true;
+      button.disabled = false;
+      results.removeAttribute("aria-busy");
+    }
+  });
+</script>

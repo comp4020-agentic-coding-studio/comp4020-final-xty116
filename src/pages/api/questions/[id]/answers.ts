@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { recordActivity } from "../../../../lib/activity";
 import { createAnswer, questionGroupId, type Viewer } from "../../../../lib/db";
-import { assertSameOrigin, errorResponse, formText, seeOther, ValidationError } from "../../../../lib/http";
+import { assertSameOrigin, errorResponse, seeOther, ValidationError } from "../../../../lib/http";
 import { publishToGroup } from "../../../../lib/realtime";
 import { getOrCreateViewer } from "../../../../lib/session";
 import { contributionContent, contributionForm } from "../../../../lib/media";

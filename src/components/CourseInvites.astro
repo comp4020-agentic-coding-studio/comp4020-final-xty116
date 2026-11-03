@@ -1,24 +1,117 @@
 ---
 import { listCourseInvites, type GroupSummary } from "../lib/db";
-interface Props { group: GroupSummary; viewerId: string }
+interface Props {
+  group: GroupSummary;
+  viewerId: string;
+}
 const { group, viewerId } = Astro.props;
 const invites = listCourseInvites(group.id, viewerId);
 const joinLink = new URL(`/join/${group.inviteCode}`, Astro.url.origin).href;
 ---
-{group.isOwner && <section class="invite-panel" id="invitations">
-  <div class="panel-heading"><span class="icon-tile blue"><i data-lucide="user-plus" aria-hidden="true"></i></span><div><p class="eyebrow">Organiser workspace</p><h2>Invite your people</h2></div></div>
-  <div class="invite-code-row"><code data-invite-code>{group.inviteCode}</code><button class="icon-button" type="button" data-copy={joinLink} aria-label="Copy group invite link" data-tooltip="Copy invite link"><i data-lucide="copy" aria-hidden="true"></i></button></div>
-  <p class="field-note">Share the group link in your class channel, or create one-use invitations below.</p>
-  <details class="roster-details"><summary>Invite a whole class <i data-lucide="chevron-down" aria-hidden="true"></i></summary>
-    <form class="stack-form" method="post" action={`/api/groups/${group.id}/invites`}>
-      <label><span>Names or emails, one per line</span><textarea name="roster" rows="5" maxlength="15000" placeholder={"alex@example.edu\nsam@example.edu"} required></textarea></label>
-      <p class="field-note">Up to 150 at once. Only you see this list. Share the generated links yourself; StudyNow does not send email or verify enrolment.</p>
-      <button class="secondary-button" type="submit"><i data-lucide="list-plus" aria-hidden="true"></i>Create invitations</button>
-    </form>
-  </details>
-  {invites.length > 0 && <details class="roster-details" open>
-    <summary>{invites.filter(i => i.accepted).length} of {invites.length} invitations accepted <i data-lucide="chevron-down" aria-hidden="true"></i></summary>
-    <div class="invitation-list">{invites.map(invite => <div class="invitation-row"><div><strong>{invite.label}</strong><small>{invite.accepted ? "Accepted" : "Pending"}</small></div><button class="icon-button" type="button" data-copy={new URL(`/invite/${invite.token}`, Astro.url.origin).href} aria-label={`Copy invitation for ${invite.label}`} data-tooltip="Copy personal link"><i data-lucide="copy" aria-hidden="true"></i></button><a class="sr-only" href={`/invite/${invite.token}`}>Open invitation</a></div>)}</div>
-    <button class="text-action" type="button" data-invite-export data-rows={JSON.stringify(invites.map(i => ({ student: i.label, link: new URL(`/invite/${i.token}`, Astro.url.origin).href, status: i.accepted ? "Accepted" : "Pending" })))}><i data-lucide="download" aria-hidden="true"></i>Download invitation list</button>
-  </details>}
-</section>}
+
+{group.isOwner && (
+  <section class="invite-panel" id="invitations">
+    <div class="panel-heading">
+      <span class="icon-tile blue">
+        <i data-lucide="user-plus" aria-hidden="true"></i>
+      </span>
+      <div>
+        <p class="eyebrow">Organiser workspace</p>
+        <h2>Invite your people</h2>
+      </div>
+    </div>
+    <div class="invite-code-row">
+      <code data-invite-code>{group.inviteCode}</code>
+      <button
+        class="icon-button"
+        type="button"
+        data-copy={joinLink}
+        aria-label="Copy group invite link"
+        data-tooltip="Copy invite link"
+      >
+        <i data-lucide="copy" aria-hidden="true"></i>
+      </button>
+    </div>
+    <p class="field-note">
+      Share the group link in your class channel, or create one-use invitations
+      below.
+    </p>
+    <details class="roster-details">
+      <summary>
+        Invite a whole class{" "}
+        <i data-lucide="chevron-down" aria-hidden="true"></i>
+      </summary>
+      <form
+        class="stack-form"
+        method="post"
+        action={`/api/groups/${group.id}/invites`}
+      >
+        <label>
+          <span>Names or emails, one per line</span>
+          <textarea
+            name="roster"
+            rows="5"
+            maxlength="15000"
+            placeholder={"alex@example.edu\nsam@example.edu"}
+            required
+          ></textarea>
+        </label>
+        <p class="field-note">
+          Up to 150 at once. Only you see this list. Share the generated links
+          yourself; StudyNow does not send email or verify enrolment.
+        </p>
+        <button class="secondary-button" type="submit">
+          <i data-lucide="list-plus" aria-hidden="true"></i>Create invitations
+        </button>
+      </form>
+    </details>
+    {invites.length > 0 && (
+      <details class="roster-details" data-invite-state open>
+        <summary>
+          {invites.filter((i) => i.accepted).length} of {invites.length}{" "}
+          invitations accepted{" "}
+          <i data-lucide="chevron-down" aria-hidden="true"></i>
+        </summary>
+        <div class="invitation-list">
+          {invites.map((invite) => (
+            <div class="invitation-row">
+              <div>
+                <strong>{invite.label}</strong>
+                <small>{invite.accepted ? "Accepted" : "Pending"}</small>
+              </div>
+              <button
+                class="icon-button"
+                type="button"
+                data-copy={
+                  new URL(`/invite/${invite.token}`, Astro.url.origin).href
+                }
+                aria-label={`Copy invitation for ${invite.label}`}
+                data-tooltip="Copy personal link"
+              >
+                <i data-lucide="copy" aria-hidden="true"></i>
+              </button>
+              <a class="sr-only" href={`/invite/${invite.token}`}>
+                Open invitation
+              </a>
+            </div>
+          ))}
+        </div>
+        <button
+          class="text-action"
+          type="button"
+          data-invite-export
+          data-rows={JSON.stringify(
+            invites.map((i) => ({
+              student: i.label,
+              link: new URL(`/invite/${i.token}`, Astro.url.origin).href,
+              status: i.accepted ? "Accepted" : "Pending",
+            })),
+          )}
+        >
+          <i data-lucide="download" aria-hidden="true"></i>Download invitation
+          list
+        </button>
+      </details>
+    )}
+  </section>
+)}

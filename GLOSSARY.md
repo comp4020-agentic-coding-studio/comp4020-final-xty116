@@ -26,4 +26,23 @@ denial, limited to actor, action, outcome and resource references.
 _Avoid_: Audit history
 
 **Draft**:
-Unsubmitted text held by one browser, outside shared state and activity logs.
+A text or visual contribution that has not been shared with a room.
+
+**Room**:
+A learning space with shared questions, explanations and a membership boundary.
+A course room records its school and subject; a public room is discoverable by everyone.
+_Avoid_: Channel, classroom account
+
+**Organiser**:
+The viewer who creates a room and manages its invitations. An organiser may be
+a teacher, but the role does not prove employment or enrolment.
+_Avoid_: Verified teacher, administrator
+
+**Explanation**:
+One person's contribution to understanding a question, expressed through text,
+images or handwriting. Several explanations can coexist.
+_Avoid_: Best answer, generated solution
+
+**Similar question**:
+An existing discussion whose underlying idea may help with the present question.
+_Avoid_: AI answer

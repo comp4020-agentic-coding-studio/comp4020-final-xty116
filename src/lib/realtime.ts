@@ -16,7 +16,15 @@ export interface PresenceChangedEvent {
   activeLearners: number;
 }
 
-export type GroupEvent = QuestionCreatedEvent | AnswerCreatedEvent | PresenceChangedEvent | { type: "group.changed" | "question.updated"; groupId: number; questionId?: number };
+export type GroupEvent =
+  | QuestionCreatedEvent
+  | AnswerCreatedEvent
+  | PresenceChangedEvent
+  | {
+      type: "group.changed" | "question.updated" | "commons.changed";
+      groupId: number;
+      questionId?: number;
+    };
 type Subscriber = (event: GroupEvent) => void;
 
 interface GroupChannel {
@@ -40,7 +48,10 @@ export function subscribeToGroup(
     connectionsByViewer: new Map<string, number>(),
   };
   channel.subscribers.add(subscriber);
-  channel.connectionsByViewer.set(viewerId, (channel.connectionsByViewer.get(viewerId) ?? 0) + 1);
+  channel.connectionsByViewer.set(
+    viewerId,
+    (channel.connectionsByViewer.get(viewerId) ?? 0) + 1,
+  );
   channels.set(groupId, channel);
   broadcast(channel, {
     type: "presence.changed",
@@ -69,4 +80,7 @@ export function subscribeToGroup(
 export function publishToGroup(event: GroupEvent): void {
   const channel = channels.get(event.groupId);
   if (channel) broadcast(channel, event);
+  const commons = channels.get(0);
+  if (commons && event.groupId !== 0)
+    broadcast(commons, { type: "commons.changed", groupId: 0 });
 }

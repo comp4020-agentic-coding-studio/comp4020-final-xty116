@@ -1,0 +1,15 @@
+---
+import Layout from "../layouts/Layout.astro";
+import SetupForm from "../components/SetupForm.astro";
+import { getOrCreateViewer } from "../lib/session";
+export const prerender = false;
+const viewer = getOrCreateViewer(Astro.cookies);
+---
+
+<Layout title="Join a room | StudyNow" {viewer}>
+  <section class="standalone-form">
+    <p class="eyebrow">Keep your people close</p>
+    <h1>Join a room</h1>
+    <SetupForm mode="join" {viewer} />
+  </section>
+</Layout>
