@@ -2848,7 +2848,7 @@ input[type="range"] {
     height: 220px;
   }
   .commons-strip > div {
-    padding: 35px 36px;
+    padding: 24px 30px;
   }
   .commons-strip h2 {
     font-size: 32px;
@@ -3363,7 +3363,7 @@ input[type="range"] {
   .commons-strip {
     grid-template-columns: minmax(0, 1fr) 30%;
     min-height: 0;
-    height: 197px;
+    height: 222px;
   }
   .commons-strip > div {
     padding: 21px;
