@@ -3,9 +3,8 @@
 ## Start here
 
 [Open StudyNow](https://comp4020-final-xty116.fly.dev/). No account, installation,
-API key or payment is required. Use two separate Chrome profiles;
-an incognito window also works. Each browser receives its own durable identity.
-Keep that profile's cookies when returning tomorrow.
+API key or payment is required. Use two Chrome profiles (incognito works).
+Each receives a durable identity; keep its cookies when returning.
 
 1. In profile A, select **Create room**, enter a school and course, and keep
    **Invite only** selected. The creator becomes its organiser.
@@ -21,9 +20,11 @@ Keep that profile's cookies when returning tomorrow.
    through **Find understanding** to rediscover it. Keyword search is always
    available; AI mode labels model matches and any service-unavailable fallback.
 
-For a class, create up to 150 individual invitations, copy links or download a
-CSV, and see acceptance counts. **Explore** is
-the worldwide directory of public rooms. The example room labels its starter discussions.
+For a class, create up to 150 invitations, copy links or download CSV, and see
+acceptance counts. **Explore** lists public rooms; example discussions are labelled.
+
+Deployment note (3 November): AI currently falls back to keyword search because
+the course model gateway is ANU-network-only. Browser collaboration is unaffected.
 
 ## What good means here
 

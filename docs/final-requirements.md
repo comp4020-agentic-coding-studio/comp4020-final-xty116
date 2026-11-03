@@ -29,6 +29,11 @@ not COMP8020: no research note is required.
 - Model-assisted search finds conceptually similar existing questions and their explanations across accessible rooms.
 - Every visible control works; the interaction and presentation are polished on phone and desktop.
 
+Outstanding operational dependency: the model adapter passes contract tests,
+but the course gateway is ANU-network-only and cannot be reached from Fly.
+Production currently labels its keyword fallback. A publicly reachable,
+authorised provider is required before claiming the user's AI requirement complete.
+
 ## Marker access notice supplied by the user
 
 Markers start from `/readme/` with only the URL and use two separate Chrome

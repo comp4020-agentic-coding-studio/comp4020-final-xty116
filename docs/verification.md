@@ -39,6 +39,11 @@ The app was exercised at 1920x1080 and 390x844. The desktop document width was
 The phone drawing test made actual strokes, used undo/redo and published the
 saved PNG, which rendered on its question page.
 
+The final phone check also found a clipped commons action. Reducing its heading
+and increasing its supporting text to 11px kept the action inside the band:
+its bottom was 500.9px against the band's 537.5px bottom, with a 390px document
+width. See [phone workspace](evidence/workspace-phone.jpg).
+
 A separate draft put strokes near the lower-right canvas edge. After a same-size
 reload the restored bitmap measured 344x213, rather than the default 300x150;
 the far-edge strokes remained visible. The text draft and image description
@@ -57,12 +62,26 @@ record does not claim an in-person classroom learning study.
 
 ## Operational evidence
 
+The public main-branch deployment at `5ab849f` passed
+[CI run 41618074650](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/actions/runs/41618074650),
+including all 18 checks, evidence validation, secret scans and Fly deployment.
+Ten additional checks in five files then passed against the actual public URL,
+covering rooms, contributions, visual attachments, class invitations, search
+permissions and structural accessibility. These online fixtures are private.
+A private question created before deployment was readable afterwards using its
+original browser credential, confirming text persistence across a real redeploy.
+
 The configured course Claude proxy returned HTTP 200 and an actual model reply
-after VPN connectivity was confirmed. At the student's explicit approval,
+from the student's VPN-connected computer. At the student's explicit approval,
 the key, provider URL and model name were stored as encrypted GitHub secrets
-for the course repository. They are staged into Fly through CI, without being
-printed, committed, or sent to the browser. Production retrieval is verified
-separately after deployment.
+and staged into Fly through CI, without printing them, committing them or
+sending them to the browser. However, the deployed AI request returned the
+honest keyword fallback, not a model result. The
+[official access documentation](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/llm-access/)
+states that strproxy accepts only ANU-network traffic. A laptop VPN does not
+put the Fly server on that network. Live model retrieval therefore remains
+blocked pending an authorised, publicly reachable provider; its adapter is
+implemented and contract-tested, but production AI connectivity is not claimed.
 
 The application requires no marker account, command, API key or payment. The
 first section at `/readme/` gives its complete browser-only entry sequence.
