@@ -145,6 +145,12 @@ gateway remains unreachable from Fly. The disclosure in
 keeps that limitation explicit. I do not count a test-double reply or keyword
 fallback as working production AI.
 
+My next step is to connect the deployed app to an authorised model API reachable
+from Fly, so learners can find conceptually related discussions beyond keyword
+overlap. This is planned work, not a completed feature: live AI retrieval is
+not available yet. Before claiming completion, I would verify real model results,
+private-room isolation and failure handling on the deployed site.
+
 The recorded acceptance run passed 18 tests; ten additional checks exercised
 the public deployment. Restart and redeploy checks preserved private content.
 Browser checks at 1920x1080 and 390x844 exercised sketch publication, recovery
