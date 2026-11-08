@@ -87,6 +87,25 @@ The application requires no marker account, command, API key or payment. The
 first section at `/readme/` gives its complete browser-only entry sequence.
 There is no additional marker setup requiring the private-Ed exception.
 
+## Pre-deadline recheck: 9 November 2026
+
+At approximately 01:48 Sydney time, ten live checks in five files passed again
+against the public Fly application. Anonymous requests to `/`, `/readme/` and
+the public example room returned HTTP 200; the README still contained the
+two-profile marking journey. GitHub reported the repository as public with
+`/readme/` as its homepage. The three earlier crit tag objects were unchanged.
+
+The private image retained from the 3 November verification was still readable
+with its original browser credential and its bytes matched exactly; a request
+without that credential returned 404. A fresh AI request explicitly returned
+`mode: keyword` with the unavailable-upstream message. Live model connectivity
+therefore remains incomplete, despite the working keyword search.
+
+The final narration revision starts with the student's stated motivation and
+uses first person for project aims and judgements. Implementation and browser
+test execution remain identified as agent-operated; no personal test session,
+classmate feedback or educational outcome was invented.
+
 ## Disclosed boundaries
 
 An invitation proves possession, not school enrolment; lists are distributed

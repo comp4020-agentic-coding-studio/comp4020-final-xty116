@@ -1,167 +1,159 @@
 # Building StudyNow
 
-This account was assembled with Codex from the repository and the student's
-recorded directions: small groups, course invitations, anonymous questions,
-visual working, several explanations and retrieval. The agent implemented and
-checked the system; this document does not invent student interviews or personal
-experiences. The [detailed evidence appendix](docs/process-evidence.md) expands
-the incidents below; [verification notes](docs/verification.md) distinguish
-automated, browser and operational evidence.
+I wanted a shared place where student groups could gather around questions as
+they arise, ask and answer in real time, and work across countries using text,
+images and handwriting. My priority was discussion that helps people work
+through a problem together, not another feed or a private chatbot. Anonymity
+supports that purpose, but it is not the whole idea.
 
-## From a feature list to a learning commons
+## Turning my aim into rules
 
-The student's stated gap is a place for groups to gather around questions as
-they arise, with worldwide participation and text, images and handwriting for
-working through them. That priority makes co-presence and expressive explanations
-central; anonymity supports participation but is not the whole purpose.
-
-The initial risk was building a generic chat room with educational labels.
+I needed a definition of good that reached beyond a feature list.
 [59f2614](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/59f2614)
-turned the direction into rules: retain different explanations, protect
-private-course boundaries and avoid popularity scores. The final argument uses
+records the starting rules: retain different explanations, protect private-course
+boundaries and avoid popularity scores. For my final argument, I use
 [Edmondson's account](https://www.hbs.edu/ris/download.aspx?name=02-062.pdf) of
 interpersonal risk to consider anonymity;
 [Mazur's Peer Instruction](https://mazur.harvard.edu/presentations/peer-instruction-getting-students-think-class-0)
-supports asking learners to explain reasoning. Neither establishes StudyNow's
-educational effectiveness. The README makes that distinction and cites its
-sources. The chain is specific: "safe participation" becomes server-side membership
-and anonymous presentation rules, then outsider-read and name-leak tests.
-"Useful tomorrow" becomes persistent storage, then restart checks. Whether the
-explanation actually helps remains a human judgement, not an assertion hidden
-inside a passing test.
+supports learners explaining reasoning to one another. Neither proves that
+StudyNow improves learning.
 
-Images and retrieval were initially deferred until joining, asking and answering
-were durable. That sequencing reduced the number of simultaneous unknowns;
-it did not redefine the original request as text-only. Class invitations later
-remained possession-based rather than pretending to verify teachers or enrolment.
+I connect those ideas to observable commitments: safe participation means
+membership checks and anonymous presentation, tested through outsider reads
+and recognisable-name sentinels. Help remaining useful tomorrow means durable
+storage, tested through restarts. I leave the usefulness of an explanation to
+human judgement rather than treating a passing test as educational evidence.
 
-## Why this stack and workflow
+The first implementation deferred images and retrieval until joining, asking
+and answering were durable. I still wanted visual discussion; that sequence
+reduced simultaneous unknowns instead of quietly dropping the original aim.
+Course invitations remained possession-based, not a claim to verify teachers
+or university enrolment.
 
-[ADR 001](docs/adr-001-stack.md) compares Astro SSR and SQLite with a separate
-React/Express client and a managed backend. One 256 MB machine and one volume
-favoured one rendering and permission boundary. Native HTTP forms keep core
-actions usable without JavaScript; SQLite transactions keep contributions
-consistent on persistent storage. The costs are synchronous database work,
-bounded write concurrency and no horizontal replicas.
+## My stack and agent workflow
 
-The agent workflow paired bounded changes with running-app contracts and
-browser inspection, not private-helper tests alone.
+My implementation follows the one-process choice in [ADR 001](docs/adr-001-stack.md):
+Astro SSR and SQLite rather than a separate React/Express client or managed
+backend. With one 256 MB machine and one volume, this keeps rendering,
+permissions and storage close together. Native HTTP forms preserve core actions
+without JavaScript. The costs I accept are synchronous database work, limited
+write concurrency and no horizontal replicas.
+
+I supplied the product direction and requests for completeness and polish;
+the agent implemented changes and executed automated and browser checks.
+Acceptance relied on running-app contracts and visual evidence, not the
+agent's summary alone.
 [3e23482](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/3e23482)
-defines two cookie identities, denied private reads, invitation acceptance and
-anonymous contributions;
+defines two cookie identities, denied private reads and anonymous contributions;
 [de07056](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/de07056)
-implements them. The test deliberately chooses a recognisable display name
-and checks that anonymous posts do not reveal it. This makes privacy observable,
-rather than a hidden-button convention. Not every feature began red; the cited
-test-first sequences are specific examples, not a claim about every commit.
-This is slower than accepting the agent's summary, but tests the same URLs and
-cookies users exercise. Browser inspection handles what these contracts cannot:
-hierarchy, visible controls and the recoverability of partially written work.
+implements them. A recognisable display name makes accidental identity exposure
+detectable. Not every feature began red: these are specific test-first sequences,
+not a rewritten history of every commit. Browser inspection covers hierarchy,
+visible actions and recoverable drafts that HTTP assertions cannot judge.
 
-## Deployment changed the harness
+## What deployment changed
 
 The first live forms failed because Fly terminates HTTPS before forwarding HTTP.
-Removing origin protection would hide the symptom by weakening security.
+That exposed a gap between local acceptance and the production request boundary.
 [e0af07b](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/e0af07b)
-instead trusts the exact course proxy host and adds its forwarded-header
-regression while retaining cross-origin rejection. Local success had not tested
-the production request boundary.
+trusts the exact course proxy host and adds a forwarded-header regression while
+retaining foreign-origin rejection. I regard this as a harness correction:
+removing origin protection would merely hide the symptom by weakening security.
 
 ## Real time without exposing private thinking
 
+For me, being together should mean seeing submitted reasoning, not watching
+someone's unfinished draft.
 [d692900](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/d692900)
 requires a second session to receive a question within one second.
 [e9805b2](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/e9805b2)
 and
 [091b5d4](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/091b5d4)
-broadcast committed questions and explanations through SSE. Existing form writes
-made a one-way channel simpler than WebSockets; reconnection rebuilds from SQLite
-instead of requiring replay of every event.
+broadcast committed questions and explanations. Existing HTTP form writes make
+SSE simpler than a second bidirectional protocol. Reconnection rebuilds from
+SQLite instead of requiring replay of every event.
 
-[ADR 002](docs/adr-002-realtime-presence.md) rejects both a named roster and total
-invisibility in favour of aggregate presence. The contract in
+[ADR 002](docs/adr-002-realtime-presence.md) weighs a named roster against
+invisibility and chooses aggregate presence.
 [9f8a850](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/9f8a850)
-excludes recognisable names.
+excludes recognisable names;
 [345054f](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/345054f)
-patches discussion regions, never the composer. The trade-off is weaker direct
-coordination, accepted to keep reading and unfinished reasoning private.
+patches discussion regions, never the composer. I accept weaker direct
+coordination to preserve anonymous reading and private drafting.
 
-## Observability is not another identity leak
+## Making failures legible
 
+I also need operational evidence without another identity leak.
 [9685afe](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/9685afe)
-starts the built server and inspects stdout;
+inspects the built server's stdout;
 [897a067](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/897a067)
-adds correlated activity events. Later contracts exposed missing denial paths;
+adds correlated events. Later contracts exposed missing denial paths;
 [ad54a38](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/ad54a38)
 records rejected collaboration too. [ADR 003](docs/adr-003-operational-identity.md)
-explains the compromise: a short session digest distinguishes actors without
-printing their authentication cookies, names or contributions. That digest
-correlates activity; it never grants access.
+uses a short session digest rather than authentication cookies, names or
+contribution text. The digest correlates actions; it never grants access.
 
-## Completing and correcting visual participation
+## Completing visual participation
 
+Text alone did not satisfy my aim of discussing diagrams and handwritten working.
 [3fb2b9a](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/3fb2b9a)
-commits image bytes and their contribution together. [ADR 004](docs/adr-004-visual-retrieval.md)
-rejects ephemeral image files and an extra object-store dependency, accepting a
-larger SQLite database.
+commits image bytes with their parent contribution. [ADR 004](docs/adr-004-visual-retrieval.md)
+rejects ephemeral files and an extra object-store dependency, accepting larger
+database backups.
 [23dc90a](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/23dc90a)
-adds organiser-only rosters and single-use invitations after its endpoint
-contract initially failed.
+adds organiser-only rosters and single-use invitations after a missing-endpoint
+failure.
 [6ea764e](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/6ea764e)
 integrates Signature Pad, image previews and recoverable drafts.
 
-Review in
+The review correction in
 [434e6ef](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/434e6ef)
-found plausible image headers did not prove decodable pixels, and restored
-sketches could clip at the canvas's default bitmap size. Full Sharp decoding
-and sizing before stroke restoration corrected those assumptions. Malformed-byte
-rejection became an executable check; restored edge strokes were inspected
-in the browser. The phone layout correction in
+replaces plausible image-header checks with full Sharp decoding and sizes the
+canvas before restoring strokes. Malformed-byte rejection became executable;
+restored edge strokes were inspected in the browser. Those are different kinds
+of evidence, and I keep them separate.
+
+I wanted the interface to make finding a discussion easier, not just look polished.
+The empty first-visit panel gave way to an immediately joinable example.
 [6af3219](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/6af3219)
-also keeps the commons action within its band. The earlier empty-room panel
-pushed useful public discussion below the first screen; the revised first visit
-offers a joinable example immediately. Native dialogs retain ordinary links,
-focus containment and Escape. These decisions serve the question-to-explanation
-journey rather than adding decorative screens.
+corrects a clipped phone action. Native dialogs retain ordinary links, focus
+containment and Escape rather than creating decorative dead ends.
 
-## Retrieval, concurrency and honest limits
+## Retrieval and concurrency
 
+My retrieval aim is to reconnect learners with existing discussions, not replace
+their explanations with an authoritative generated answer.
 [5266365](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/5266365)
-retrieves existing discussions instead of generating an authoritative answer.
-The server authorises candidates before model contact and validates returned IDs
-again. Its fake upstream proposes forbidden and invented IDs, then fails; the
-contract requires filtered sources and labelled keyword fallback. Names, images
-and drafts stay out of model context.
+authorises candidates before model contact and validates returned IDs again.
+Its fake upstream proposes forbidden and invented sources, then fails; the
+contract requires filtered sources and labelled keyword fallback.
 
-A specification review exposed an ordering failure: a newer search finished
-before an older refresh, stranding a queued peer update. The regression in
+A specification review found a newer search could finish before an older
+refresh, leaving a peer update stranded.
 [434e6ef](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/434e6ef)
-expects a third request but initially observes two.
+commits a regression expecting three requests but observing two.
 [495a9a9](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/495a9a9)
-drains queued work after releasing the refresh lock. The same test checks that
-unfinished input remains local, connecting a concurrency correction to the
-privacy rule.
+drains queued work after releasing the refresh lock. The test also keeps
+unfinished query text local. I see this as a concrete connection between
+concurrency correctness and draft privacy.
 
-Production exposed another boundary: the course model works from the student's
-VPN-connected computer but its ANU-only gateway is unreachable from Fly.
+## What I can and cannot claim
+
+The course model answered from my VPN-connected computer, but its ANU-only
+gateway remains unreachable from Fly. The disclosure in
 [6af3219](https://github.com/comp4020-agentic-coding-studio/comp4020-final-xty116/commit/6af3219)
-discloses this failure. A contract-test reply is not production AI success.
-The app therefore retains keyword retrieval and tells visitors which mode they
-received. Solving the dependency requires an authorised reachable provider, not
-a visitor-supplied key, a laptop left running or an undocumented marker setup.
+keeps that limitation explicit. I do not count a test-double reply or keyword
+fallback as working production AI.
 
-## What acceptance establishes
+The recorded acceptance run passed 18 tests; ten additional checks exercised
+the public deployment. Restart and redeploy checks preserved private content.
+Browser checks at 1920x1080 and 390x844 exercised sketch publication, recovery
+and peer updates. These were agent-operated checks, not a classmate usability
+study. I still need real learner feedback to judge usefulness and comfort.
 
-The recorded acceptance run passed 18 tests; ten additional checks exercised the
-public deployment. A real process restart preserved private text and images;
-a live redeploy preserved submitted records. At 1920x1080 and 390x844, browser
-checks exercised sketch publication, draft recovery and peer updates without
-reloads. These are agent-operated checks, not a two-classmate usability study.
-The preserved crit tags and linked commits let a reader reconstruct the work.
-
-What remains judged is whether learners find explanations useful and feel safe
-asking. The sources guide those choices but cannot replace actual classroom
-feedback. The detailed appendix records limitations alongside each result.
+The [evidence appendix](docs/process-evidence.md) traces each incident;
+[verification notes](docs/verification.md) separate its results and limitations.
+The preserved crit tags and linked commits keep earlier stages inspectable.
 
 ![Desktop workspace](docs/evidence/workspace-desktop.jpg)
 ![Posted sketch on a phone](docs/evidence/question-phone.jpg)

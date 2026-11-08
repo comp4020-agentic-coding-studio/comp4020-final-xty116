@@ -1,11 +1,10 @@
 # Detailed process evidence
 
-This appendix supports, rather than replaces, the argument in
-[PROCESS.md](../PROCESS.md). It was compiled with Codex from the committed
-implementation, executable contracts and the recorded 3 November acceptance
-checks. It does not claim student interviews, classroom deployment or a
-two-classmate usability study. The student supplied the product direction;
-agent-operated verification is identified as such.
+This appendix traces the decisions in [PROCESS.md](../PROCESS.md) to the
+committed implementation, executable contracts and recorded acceptance checks.
+It supports, rather than replaces, the main argument. Product direction and
+agent-operated verification are distinguished throughout; no student interviews,
+classroom deployment or two-classmate usability study are claimed.
 
 ## Reading the evidence
 
